@@ -4,6 +4,7 @@ import { Bar, Line, Pie } from "react-chartjs-2";
 import { ScrollArea, Space, Text } from "@mantine/core";
 import { LambdaURLAu, LambdaURLEU, LambdaURLUsEast, LiveEvent } from "./Events";
 import { Dictionary, groupBy } from "lodash";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 export interface ChartsProps {
   tickSpeed?: number;
@@ -26,6 +27,10 @@ const borderColors = [
   "rgba(153, 102, 255, 1)",
   "rgba(255, 159, 64, 1)",
 ];
+
+const euClient: AxiosInstance = axios.create()
+const usClient: AxiosInstance = axios.create()
+const auClient: AxiosInstance = axios.create()
 
 export const Charts: FunctionComponent<ChartsProps> = ({
   tickSpeed = 1000,
@@ -52,18 +57,31 @@ export const Charts: FunctionComponent<ChartsProps> = ({
   };
 
   const emitData = async () => {
-    const resUs: LiveEvent[] = (await (
-      await fetch(`${LambdaURLUsEast}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
-    const resEu: LiveEvent[] = (await (
-      await fetch(`${LambdaURLEU}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
-    const resAu: LiveEvent[] = (await (
-      await fetch(`${LambdaURLAu}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
+    const promiseUs: Promise<AxiosResponse<LiveEvent[], any>> = usClient.get<LiveEvent[]>(`${LambdaURLUsEast}&last=${tickSpeed}`)
+    const promiseEu: Promise<AxiosResponse<LiveEvent[], any>> = euClient.get<LiveEvent[]>(`${LambdaURLEU}&last=${tickSpeed}`)
+    const promiseAu: Promise<AxiosResponse<LiveEvent[], any>> = auClient.get<LiveEvent[]>(`${LambdaURLAu}&last=${tickSpeed}`)
 
-    const allRes = [...resUs, ...resEu, ...resAu];
+    const allRes = await Promise.all([promiseAu, promiseEu, promiseUs])
+    .then(allRes => allRes.flatMap(res => res.data))
+    .catch(e => {
+      console.log(e)
+      const liveEvent: LiveEvent = {
+        city: "",
+        event_id: "",
+        inserted_at: 0,
+        lat: "",
+        long: "",
+        region: "us-east-1",
+        timestamp: 0,
+        type: ""
+      }
+      return [liveEvent];
+    });
 
+    const resUs = (await promiseUs).data
+    const resEu = (await promiseEu).data
+    const resAu = (await promiseAu).data
+    
     const byTypes = groupBy(allRes, (r) => {
       if (r.type === "event") {
         return r.productAction!;
@@ -95,7 +113,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
     if (Object.keys(byCity).length && animationTick % 5 === 0) {
       setEventsByCity(byCity);
     }
-    const newMoney = resUs.reduce((prev, current) => {
+    const newMoney = allRes.reduce((prev, current) => {
       if (current.price) {
         if (typeof current.price === "string") {
           const replaced = Number(current.price.replaceAll('"', ""));
