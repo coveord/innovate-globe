@@ -61,7 +61,9 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
   const [latencyEu, setLatencyEu] = useState<number>(0);
   const [latencyAu, setLatencyAu] = useState<number>(0);
   const [money, setMoney] = useState<number>(0);
-  const [newMoney, setNewMoney] = useState<number>(0);
+  const [newMoneyEu, setNewMoneyEu] = useState<number>(0);
+  const [newMoneyAu, setNewMoneyAu] = useState<number>(0);
+  const [newMoneyUs, setNewMoneyUs] = useState<number>(0);
   const [animationTick, setAnimationTick] = useState(0);
   const chartsOptions = {
     responsive: true,
@@ -95,7 +97,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
         .concat({ num: Math.round(events.length/(tickSpeed/1000)), time: now })
         .slice(-100));
 
-      setNewMoney(events.reduce((prev, current) => {
+      setNewMoneyUs(events.reduce((prev, current) => {
         if (current.price) {
           if (typeof current.price === "string") {
             const replaced = Number(current.price.replaceAll('"', ""));
@@ -107,7 +109,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
         } else {
           return prev;
         }
-      }, newMoney));
+      }, 0));
   
       if (events[0]) {
         const total = events.reduce((previous, current) => {
@@ -145,7 +147,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
         .concat({ num: Math.round(events.length/(tickSpeed/1000)), time: now })
         .slice(-100));
 
-      setNewMoney(events.reduce((prev, current) => {
+      setNewMoneyEu(events.reduce((prev, current) => {
         if (current.price) {
           if (typeof current.price === "string") {
             const replaced = Number(current.price.replaceAll('"', ""));
@@ -157,7 +159,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
         } else {
           return prev;
         }
-      }, newMoney));
+      }, 0));
 
       if (events[0]) {
         const total = events.reduce((previous, current) => {
@@ -195,7 +197,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
         .concat({ num: Math.round(events.length/(tickSpeed/1000)), time: now })
         .slice(-100));
 
-      setNewMoney(events.reduce((prev, current) => {
+      setNewMoneyAu(events.reduce((prev, current) => {
         if (current.price) {
           if (typeof current.price === "string") {
             const replaced = Number(current.price.replaceAll('"', ""));
@@ -207,7 +209,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
         } else {
           return prev;
         }
-      }, newMoney));
+      }, 0));
   
       if (events[0]) {
         const total = events.reduce((previous, current) => {
@@ -234,10 +236,11 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
   }
 
   const emitData = async () => {  
-    getAuEvents();
-    getEuEvents();
-    getUsEvents();
-    
+    const promiseAu: Promise<void> = getAuEvents();
+    const promiseEu: Promise<void> =getEuEvents();
+    const promiseUs: Promise<void> =getUsEvents();
+
+    await Promise.all([promiseAu, promiseEu, promiseUs])
 
     if (Object.keys(newEventsByType).length && animationTick % 5 === 0) {
       setEventsByType(Object.assign({}, eventsByType, newEventsByType));
@@ -263,9 +266,8 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
       setNewNumEventsUs([]);
     }
 
-    if(newMoney !== 0) {
-      setMoney(money + newMoney);
-      setNewMoney(0);
+    if([newMoneyAu, newMoneyEu, newMoneyUs].find(money => money !== 0)) {
+      setMoney(money + newMoneyAu + newMoneyEu + newMoneyUs);
     }
 
     setAnimationTick(animationTick + 1);
