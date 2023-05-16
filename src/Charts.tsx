@@ -4,7 +4,7 @@ import { Bar, Line, Pie } from "react-chartjs-2";
 import { ScrollArea, Space, Text } from "@mantine/core";
 import { LambdaURLAu, LambdaURLEU, LambdaURLUsEast, LiveEvent } from "./Events";
 import { Dictionary, groupBy } from "lodash";
-import axios, { AxiosInstance, AxiosResponse } from "axios";
+import axios, { AxiosInstance } from "axios";
 
 export interface ChartsProps {
   tickSpeed?: number;
@@ -106,7 +106,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
           return current.timestamp + previous;
         }, 0);
         const mean = total / events.length;
-        setLatencyEu(Math.round((new Date().getTime() - mean) / 1000));
+        setLatencyUs(Math.round((new Date().getTime() - mean) / 1000));
       }
   }
   
@@ -229,7 +229,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
 
   const emitData = async () => {  
     getAuEvents(tickSpeed);
-    getAuEvents(tickSpeed);
+    getEuEvents(tickSpeed);
     getUsEvents(tickSpeed);
     
 
