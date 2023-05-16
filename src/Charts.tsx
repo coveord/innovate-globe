@@ -265,6 +265,7 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
 
     if(newMoney !== 0) {
       setMoney(money + newMoney);
+      setNewMoney(0);
     }
 
     setAnimationTick(animationTick + 1);
