@@ -243,11 +243,11 @@ const [newNumEventsAu, setNewNumEventsAu] = useState<
     await Promise.all([promiseAu, promiseEu, promiseUs])
 
     if (Object.keys(newEventsByType).length && animationTick % 5 === 0) {
-      setEventsByType(Object.assign({}, eventsByType, newEventsByType));
+      setEventsByType(newEventsByType);
       setNewEventsByType({});
     }
     if (Object.keys(newEventsByCity).length && animationTick % 5 === 0) {
-      setEventsByCity(Object.assign({}, newEventsByCity, eventsByCity));
+      setEventsByCity(newEventsByCity);
       setNewEventsByCity({});
     }
 
