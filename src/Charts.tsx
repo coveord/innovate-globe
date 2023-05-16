@@ -61,9 +61,9 @@ export const Charts: FunctionComponent<ChartsProps> = ({
     const promiseEu: Promise<AxiosResponse<LiveEvent[], any>> = euClient.get<LiveEvent[]>(`${LambdaURLEU}&last=${tickSpeed}`)
     const promiseAu: Promise<AxiosResponse<LiveEvent[], any>> = auClient.get<LiveEvent[]>(`${LambdaURLAu}&last=${tickSpeed}`)
 
-    const allRes = await Promise.all([promiseAu, promiseEu, promiseUs])
-    .then(allRes => allRes.flatMap(res => res.data))
-    .catch(e => {
+    const resUs: LiveEvent[] = (await promiseUs
+      .then(res => res.data)
+      .catch(e => {
       console.log(e)
       const liveEvent: LiveEvent = {
         city: "",
@@ -76,11 +76,41 @@ export const Charts: FunctionComponent<ChartsProps> = ({
         type: ""
       }
       return [liveEvent];
-    });
+    }))
+    const resEu: LiveEvent[] = (await promiseEu
+      .then(res => res.data)
+      .catch(e => {
+      console.log(e)
+      const liveEvent: LiveEvent = {
+        city: "",
+        event_id: "",
+        inserted_at: 0,
+        lat: "",
+        long: "",
+        region: "us-east-1",
+        timestamp: 0,
+        type: ""
+      }
+      return [liveEvent];
+    }))
+    const resAu: LiveEvent[] = (await promiseAu
+      .then(res => res.data)
+      .catch(e => {
+      console.log(e)
+      const liveEvent: LiveEvent = {
+        city: "",
+        event_id: "",
+        inserted_at: 0,
+        lat: "",
+        long: "",
+        region: "us-east-1",
+        timestamp: 0,
+        type: ""
+      }
+      return [liveEvent];
+    }))
 
-    const resUs = (await promiseUs).data
-    const resEu = (await promiseEu).data
-    const resAu = (await promiseAu).data
+    const allRes: LiveEvent[] = [...resUs, ...resAu, ...resEu]
     
     const byTypes = groupBy(allRes, (r) => {
       if (r.type === "event") {
