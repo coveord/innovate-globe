@@ -44,6 +44,15 @@ export const Charts: FunctionComponent<ChartsProps> = ({
   const [numEventsAu, setNumEventsAu] = useState<
     Array<{ num: number; time: number }>
   >([]);
+  const [newNumEventsUs, setNewNumEventsUs] = useState<
+  Array<{ num: number; time: number }>
+>([]);
+const [newNumEventsEu, setNewNumEventsEu] = useState<
+  Array<{ num: number; time: number }>
+>([]);
+const [newNumEventsAu, setNewNumEventsAu] = useState<
+  Array<{ num: number; time: number }>
+>([]);
   const [eventsByCity, setEventsByCity] = useState<Dictionary<LiveEvent[]>>({});
   const [eventsByType, setEventsByType] = useState<Dictionary<LiveEvent[]>>({});
   const [newEventsByCity, setNewEventsByCity] = useState<Dictionary<LiveEvent[]>>({});
@@ -59,7 +68,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
     color: "white",
   };
 
-  const getUsEvents = async (tickSpeed: number) => {
+  const getUsEvents = async () => {
     const events = await usClient.get<LiveEvent[]>(`${LambdaURLUsEast}&last=${tickSpeed}`)
     .then(res => res.data)
     .catch(e => {
@@ -82,10 +91,9 @@ export const Charts: FunctionComponent<ChartsProps> = ({
       setNewEventsByType(Object.assign({}, eventsByType, types));
 
       const now = Date.now();
-      const newNumEventsUs = numEventsUs
-      .concat({ num: events.length, time: now })
-      .slice(-100);
-      setNumEventsUs(newNumEventsUs);
+      setNewNumEventsUs(numEventsUs
+        .concat({ num: Math.round(events.length/(tickSpeed/1000)), time: now })
+        .slice(-100));
 
       setNewMoney(events.reduce((prev, current) => {
         if (current.price) {
@@ -110,7 +118,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
       }
   }
   
-  const getEuEvents = async (tickSpeed: number) => {
+  const getEuEvents = async () => {
     const events = await euClient.get<LiveEvent[]>(`${LambdaURLEU}&last=${tickSpeed}`)
     .then(res => res.data)
     .catch(e => {
@@ -133,10 +141,9 @@ export const Charts: FunctionComponent<ChartsProps> = ({
       setNewEventsByType(Object.assign({}, eventsByType, types));
 
       const now = Date.now();
-      const newNumEventsEu = numEventsEu
-      .concat({ num: events.length, time: now })
-      .slice(-100);
-      setNumEventsEu(newNumEventsEu);
+      setNewNumEventsEu(numEventsEu
+        .concat({ num: Math.round(events.length/(tickSpeed/1000)), time: now })
+        .slice(-100));
 
       setNewMoney(events.reduce((prev, current) => {
         if (current.price) {
@@ -161,7 +168,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
       }
   }
   
-  const getAuEvents = async (tickSpeed: number) => {
+  const getAuEvents = async () => {
     const events = await auClient.get<LiveEvent[]>(`${LambdaURLAu}&last=${tickSpeed}`)
     .then(res => res.data)
     .catch(e => {
@@ -180,14 +187,13 @@ export const Charts: FunctionComponent<ChartsProps> = ({
       });
   
       const {types, cities} = await groupEvents(events)
-      setNewEventsByCity(Object.assign({}, eventsByCity, cities));
-      setNewEventsByType(Object.assign({}, eventsByType, types));
+      setNewEventsByCity(Object.assign({}, newEventsByCity, cities));
+      setNewEventsByType(Object.assign({}, newEventsByType, types));
 
       const now = Date.now();
-      const newNumEventsAu = numEventsAu
-      .concat({ num: events.length, time: now })
-      .slice(-100);
-      setNumEventsAu(newNumEventsAu);
+      setNewNumEventsAu(numEventsAu
+        .concat({ num: Math.round(events.length/(tickSpeed/1000)), time: now })
+        .slice(-100));
 
       setNewMoney(events.reduce((prev, current) => {
         if (current.price) {
@@ -228,30 +234,48 @@ export const Charts: FunctionComponent<ChartsProps> = ({
   }
 
   const emitData = async () => {  
-    getAuEvents(tickSpeed);
-    getEuEvents(tickSpeed);
-    getUsEvents(tickSpeed);
+    getAuEvents();
+    getEuEvents();
+    getUsEvents();
     
 
     if (Object.keys(newEventsByType).length && animationTick % 5 === 0) {
       setEventsByType(Object.assign({}, eventsByType, newEventsByType));
+      setNewEventsByType({});
     }
     if (Object.keys(newEventsByCity).length && animationTick % 5 === 0) {
       setEventsByCity(Object.assign({}, newEventsByCity, eventsByCity));
+      setNewEventsByCity({});
     }
 
-    setMoney(money + newMoney);
-    setNewMoney(0);
+    if(newNumEventsAu.length !== 0) {
+      setNumEventsAu(newNumEventsAu);
+      setNewNumEventsAu([]);
+    }
+
+    if(newNumEventsEu.length !== 0) {
+      setNumEventsEu(newNumEventsEu);
+      setNewNumEventsEu([]);
+    }
+
+    if(newNumEventsUs.length !== 0) {
+      setNumEventsUs(newNumEventsUs);
+      setNewNumEventsUs([]);
+    }
+
+    if(newMoney !== 0) {
+      setMoney(money + newMoney);
+    }
 
     setAnimationTick(animationTick + 1);
   };
 
   useEffect(() => {
-    const timeout = setTimeout(async () => {
+    const timeout = setInterval(async () => {
       await emitData();
     }, tickSpeed);
     return () => {
-      clearTimeout(timeout);
+      clearInterval(timeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animationTick]);
