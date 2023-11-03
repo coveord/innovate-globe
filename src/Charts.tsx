@@ -1,6 +1,7 @@
 /* eslint-disable */
 
 import { FunctionComponent, JSXElementConstructor, ReactElement, ReactFragment, ReactPortal, useEffect, useState } from "react";
+import Marquee from 'react-fast-marquee';
 import "chart.js/auto"; // ADD THIS
 import { Grid, Text } from "@mantine/core";
 import {
@@ -38,6 +39,8 @@ export const Charts: FunctionComponent<ChartsProps> = ({
     const [totalRevenue, setTotalRevenue] = useState<number>(0);
     const [prevTotalAddToCarts, setPrevTotalAddToCarts] = useState<number>(0);
     const [totalAddToCarts, setTotalAddToCarts] = useState<number>(0);
+
+    let productCategories = ["Clothing", "Shoes", "Consumer Electronics", "Books, Movies, Music, and Games", "Personal Care and Beauty", "Food and Beverage", "Apparel and Accessories", "Furniture and Decor", "Auto and Parts", "Sports and Outdoors", "Health and Wellness"];
 
 
     const [latency, setLatency] = useState<Record<string, number>>({});
@@ -277,6 +280,22 @@ export const Charts: FunctionComponent<ChartsProps> = ({
                 </Grid.Col>
             </Grid>
 
+            <div style={{
+                position: "fixed",
+                bottom: 20,
+                padding: 20,
+                zIndex: 2,
+                height: 120,
+                right: 0,
+                left: 0
+            }}>
+                <Text color="white" weight={"bold"} align={"left"}>Recent Product Categories</Text>
+                <Text color="white" weight={"bold"}>
+                    <Marquee>
+                        Clothing <Text color="green"> ▲</Text> Shoes <Text color="green"> ▲</Text> Consumer Electronics <Text color="green"> ▲</Text> Books, Movies, Music, and Games <Text color="green"> ▲</Text> Personal Care and Beauty <Text color="green"> ▲</Text> Food and Beverage <Text color="green"> ▲</Text> Apparel and Accessories <Text color="green"> ▲</Text> Furniture and Decor <Text color="green"> ▲</Text> Auto and Parts <Text color="green"> ▲</Text> Sports and Outdoors <Text color="green"> ▲</Text> Health and Wellness <Text color="green"> ▲</Text>
+                    </Marquee>
+                </Text>
+            </div>
 
             <div style={{
                 position: "fixed",
@@ -284,7 +303,7 @@ export const Charts: FunctionComponent<ChartsProps> = ({
                 padding: 10,
                 zIndex: 2,
                 width: "320px",
-                height: 120,
+                height: 100,
                 left: 0
             }}>
                 <Text color="white" weight={"bold"}>Latency</Text>
