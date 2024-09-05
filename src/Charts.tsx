@@ -5,10 +5,6 @@ import "chart.js/auto"; // ADD THIS
 import { Grid, Text } from "@mantine/core";
 import {
     envRegionMapping,
-    LambdaURLAu,
-    LambdaURLCaCentral,
-    LambdaURLEU,
-    LambdaURLUsEast,
     LiveEvent,
     TimeBucketMetric,
 } from "./Events";
@@ -24,19 +20,17 @@ function onBFCMWeekend(day: string) {
     return bfcmDays.includes(day);
 }
 
-const euClient: AxiosInstance = axios.create();
-const usClient: AxiosInstance = axios.create();
-const auClient: AxiosInstance = axios.create();
-const client: AxiosInstance = axios.create();
+const lambdaClient: AxiosInstance = axios.create();
 
 const bfcmDays = ["2023-11-24", "2023-11-25", "2023-11-26", "2023-11-27"];
 const isBFCMWeekend = onBFCMWeekend(new Date().toISOString().split('T')[0]);
 
 export const Charts: FunctionComponent<ChartsProps> = (props) => {
-    const [latencyUs, setLatencyUs] = useState<number>(0);
-    const [latencyEu, setLatencyEu] = useState<number>(0);
-    const [latencyAu, setLatencyAu] = useState<number>(0);
-    const [latencyCaCentral, setLatencyCaCentral] = useState<number>(0);
+    const [us1Latency, setUs1Latency] = useState<number>(0);
+    const [us2Latency, setUs2Latency] = useState<number>(0);
+    const [euLatency, setEuLatency] = useState<number>(0);
+    const [apLatency, setApLatency] = useState<number>(0);
+    const [caLatency, setCaLatency] = useState<number>(0);
 
     const [purchasesPerMinute, setPurchasesPerMinute] = useState<number>(0);
     const [revenuePerMinute, setRevenuePerMinute] = useState<number>(0);
@@ -62,14 +56,24 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
         force(query.env, "prd")
     );
 
+    var regionsInEnv: string[] = envRegionMapping[env].map((regionConfig: any) => {
+        return regionConfig["region"]
+    });;
+
     useEffect(() => {
         if (query.env !== env && query.env) {
             console.log("environment is now: ", query.env)
             setEnv(query.env!);
-        } else if (query.env !== env){ 
+            regionsInEnv = envRegionMapping[env].map((regionConfig: any) => {
+                return regionConfig["region"]
+            });
+        } else if (query.env !== env){
             console.log("environment set to default: prd")
             setEnv("prd");
-        } 
+            regionsInEnv = envRegionMapping[env].map((regionConfig: any) => {
+                return regionConfig["region"]
+            });
+        }
     }, [query.env, env])
 
     useEffect(() => {
@@ -115,12 +119,12 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             var isOnBFCMWeekend = onBFCMWeekend(currentDay);
 
             for (const regionConfig of envRegionMapping[query.env]) {
-                arrayPromises.push(await client
+                arrayPromises.push(await lambdaClient
                     .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentdate.toISOString()}&timeBucketType=minutely`).catch((e) => {
                         console.log("Caught an error calling the lambda", e);
                         return new Promise(() => { return {"data":[]}});
                     }));
-                arrayPromises.push(await client
+                arrayPromises.push(await lambdaClient
                     .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentDay}&timeBucketType=daily`));
             }
             await Promise.all(arrayPromises);
@@ -164,126 +168,59 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             }
         }
     };
-    const getUsEvents = async () => {
-        const events = await usClient
-            .get<LiveEvent[]>(`${LambdaURLUsEast}&last=${props.tickSpeed}`)
-            .then((res) => res.data)
-            .catch((e) => {
-                console.log(e);
-                const liveEvent: LiveEvent = {
-                    city: "",
-                    event_id: "",
-                    inserted_at: 0,
-                    lat: "",
-                    lng: "",
-                    region: "us-east-1",
-                    timestamp: 0,
-                    type: "",
-                };
-                return [liveEvent];
-            });
 
-        if (events[0]) {
-            const total = events.reduce((previous, current) => {
-                return current.timestamp + previous;
-            }, 0);
-            const mean = total / events.length;
-            setLatencyUs(Math.round((new Date().getTime() - mean) / 1000));
-        }
-    };
-
-    const getEuEvents = async () => {
-        const events = await euClient
-            .get<LiveEvent[]>(`${LambdaURLEU}&last=${props.tickSpeed}`)
-            .then((res) => res.data)
-            .catch((e) => {
-                console.log(e);
-                const liveEvent: LiveEvent = {
-                    city: "",
-                    event_id: "",
-                    inserted_at: 0,
-                    lat: "",
-                    lng: "",
-                    region: "us-east-1",
-                    timestamp: 0,
-                    type: "",
-                };
-                return [liveEvent];
-            });
-
-        if (events[0]) {
-            const total = events.reduce((previous, current) => {
-                return current.timestamp + previous;
-            }, 0);
-            const mean = total / events.length;
-            setLatencyEu(Math.round((new Date().getTime() - mean) / 1000));
-        }
-    };
-
-    const getAuEvents = async () => {
-        const events = await auClient
-            .get<LiveEvent[]>(`${LambdaURLAu}&last=${props.tickSpeed}`)
-            .then((res) => res.data)
-            .catch((e) => {
-                console.log(e);
-                const liveEvent: LiveEvent = {
-                    city: "",
-                    event_id: "",
-                    inserted_at: 0,
-                    lat: "",
-                    lng: "",
-                    region: "us-east-1",
-                    timestamp: 0,
-                    type: "",
-                };
-                return [liveEvent];
-            });
-
-        if (events[0]) {
-            const total = events.reduce((previous, current) => {
-                return current.timestamp + previous;
-            }, 0);
-            const mean = total / events.length;
-            setLatencyAu(Math.round((new Date().getTime() - mean) / 1000));
-        }
-    };
-
-  const getCaCentralEvents = async () => {
-        const events = await usClient
-            .get<LiveEvent[]>(`${LambdaURLCaCentral}&last=${props.tickSpeed}`)
-            .then((res) => res.data)
-            .catch((e) => {
-                console.log(e);
-                const liveEvent: LiveEvent = {
-                    city: "",
-                    event_id: "",
-                    inserted_at: 0,
-                    lat: "",
-                    lng: "",
-                    region: "us-east-1",
-                    timestamp: 0,
-                    type: "",
-                };
-                return [liveEvent];
-            });
-
-        if (events[0]) {
-            const total = events.reduce((previous, current) => {
-                return current.timestamp + previous;
-            }, 0);
-            const mean = total / events.length;
-            setLatencyCaCentral(Math.round((new Date().getTime() - mean) / 1000));
-        }
+    var getEvents: any = [];
+    for(const regionConfig of envRegionMapping[env]) {
+        const lambdaUrl = regionConfig["lambdaEndpoint"];
+        const region = regionConfig["region"];
+        getEvents.push(async () => {
+            const events = await lambdaClient
+                .get<LiveEvent[]>(`${lambdaUrl}&last=${props.tickSpeed}`)
+                .then((res) => res.data)
+                .catch((e) => {
+                    console.log(e);
+                    const liveEvent: LiveEvent = {
+                        city: "",
+                        event_id: "",
+                        inserted_at: 0,
+                        lat: "",
+                        lng: "",
+                        region: "us-east-1",
+                        timestamp: 0,
+                        type: "",
+                    };
+                    return [liveEvent];
+                });
+    
+            if (events[0]) {
+                const total = events.reduce((previous, current) => {
+                    return current.timestamp + previous;
+                }, 0);
+                const mean = total / events.length;
+                if(region == "us-east-1") {
+                    setUs1Latency(Math.round((new Date().getTime() - mean) / 1000));
+                } else if (region == "us-east-2") {
+                    setUs2Latency(Math.round((new Date().getTime() - mean) / 1000));
+                } else if (region == "eu-west-1") {
+                    setEuLatency(Math.round((new Date().getTime() - mean) / 1000));
+                } else if (region == "ap-southeast-2") {
+                    setApLatency(Math.round((new Date().getTime() - mean) / 1000));
+                } else if (region == "ca-central-1") {
+                    setCaLatency(Math.round((new Date().getTime() - mean) / 1000));
+                } else {
+                    console.log("Region not valid- {}", region);
+                }
+            }
+        });
     }
 
     const emitData = async () => {
-        const promiseAu: Promise<void> = getAuEvents();
-        const promiseEu: Promise<void> = getEuEvents();
-        const promiseUs: Promise<void> = getUsEvents();
-        const promiseCaCentral: Promise<void> = getCaCentralEvents();
+        var promiseData: Promise<void>[] = [];
+        for(const getEvent of getEvents) {
+            promiseData.push(getEvent())
+        }
 
-
-        await Promise.all([promiseAu, promiseEu, promiseUs, promiseCaCentral]);
+        await Promise.all(promiseData);
 
         setAnimationTick(animationTick + 1);
     };
@@ -314,6 +251,13 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
         currency: 'USD',
     });
 
+    const regionLatency: Record<string, number> = {
+        "us-east-1": us1Latency,
+        "us-east-2": us2Latency,
+        "eu-west-1": euLatency,
+        "ap-southeast-2": apLatency,
+        "ca-central-1": caLatency
+    }
 
     return (
         <>
@@ -422,80 +366,27 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 <Text color="white" weight={"bold"}>Latency</Text>
 
                 <Grid>
-                    <Grid.Col span={3} style={{ color: "white" }}>
-                        <Text size={14} color="white">
-                            us-east-1
-                        </Text>
-                        <Text
-                            size="sm"
-                            color={
-                                latencyUs === 0
-                                    ? "grey"
-                                    : latencyUs < 5
-                                        ? "green"
-                                        : latencyUs < 20
-                                            ? "yellow"
-                                            : "red"
-                            }
-                        >
-                            {latencyUs.toString()} seconds
-                        </Text>
-                    </Grid.Col>
-                    <Grid.Col span={3} style={{ color: "white" }}>
-                        <Text size={14} color="white">
-                            eu-west-1
-                        </Text>
-                        <Text
-                            size="sm"
-                            color={
-                                latencyEu === 0
-                                    ? "grey"
-                                    : latencyEu < 5
-                                        ? "green"
-                                        : latencyEu < 20
-                                            ? "yellow"
-                                            : "red"
-                            }
-                        >
-                            {latencyEu.toString()} seconds
-                        </Text>
-                    </Grid.Col>
-                    <Grid.Col span={3} style={{ color: "white" }}>
-                        <Text size={14} color="white">
-                            ap-southeast-2
-                        </Text>
-                        <Text
-                            size="sm"
-                            color={
-                                latencyAu === 0
-                                    ? "grey"
-                                    : latencyAu < 5
-                                        ? "green"
-                                        : latencyAu < 20
-                                            ? "yellow"
-                                            : "red"
-                            }
-                        >
-                            {latencyAu.toString()} seconds
-                        </Text>
-                    </Grid.Col>
-                    <Grid.Col span={3} style={{ color: "white" }}>
-                        <Text size={14} color="white">ca-central-1</Text>
-                        <Text
-                            size="sm"
-                            color={
-                                latencyCaCentral === 0
-                                    ? "grey"
-                                    : latencyCaCentral < 5
-                                        ? "green"
-                                        : latencyCaCentral < 20
-                                            ? "yellow"
-                                            : "red"
-                            }
-                        >
-                            {latencyCaCentral.toString()} seconds
-                        </Text>
-                    </Grid.Col>
+                    { regionsInEnv.map((region: string) => 
+                        <Grid.Col span={3} style={{ color: "white" }}>
+                            <Text size={14} color="white">
+                                {region}
+                            </Text>
+                            <Text
+                                size="sm"
+                                color={
+                                    regionLatency[region] === 0
+                                        ? "grey"
+                                        : regionLatency[region] < 5
+                                            ? "green"
+                                            : regionLatency[region] < 20
+                                                ? "yellow"
+                                                : "red"
+                                }
+                            >
+                                {regionLatency[region].toString()} seconds
+                            </Text>
+                        </Grid.Col>
+                    )}
                 </Grid>
             </div>
 
