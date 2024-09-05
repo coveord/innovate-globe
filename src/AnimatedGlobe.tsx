@@ -3,10 +3,8 @@ import ReactGlobeGl, { GlobeMethods } from "react-globe.gl";
 import globeData from "./data/admin-data.json";
 import {
   AWSRegionGeo,
-  LambdaURLAu,
-  LambdaURLCaCentral,
-  LambdaURLEU,
-  LambdaURLUsEast,
+  ValidRegions,
+  envRegionMapping,
   LiveEvent,
 } from "./Events";
 import { uniqBy } from "lodash";
@@ -84,61 +82,49 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   const globeRef = useRef<GlobeMethods>();
 
   const emitArc = async () => {
-    const resUsEast = (await (
-      await fetch(`${LambdaURLUsEast}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
-    const resEu: LiveEvent[] = (await (
-      await fetch(`${LambdaURLEU}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
-    const resAu: LiveEvent[] = (await (
-      await fetch(`${LambdaURLAu}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
-    const resCaCentral: LiveEvent[] = (await (
-      await fetch(`${LambdaURLCaCentral}&last=${tickSpeed}`)
-    ).json()) as LiveEvent[];
 
-    type validRegions = "us-east-1" | "eu-west-1" | "ap-southeast-2" | "ca-central-1";
+    var resTotal = new Map<string, LiveEvent[]>();
+    for (const regionConfig of envRegionMapping[env]) {
+      const liveEventFetcher: LiveEvent[] = (await (
+        await fetch(`${regionConfig["lambdaEndpoint"]}&last=${tickSpeed}`)
+      ).json()) as LiveEvent[];
+      resTotal.set(regionConfig["region"], liveEventFetcher);
+    }
 
-    const resTotal: Record<validRegions, LiveEvent[]> = {
-      "us-east-1": resUsEast,
-      "eu-west-1": resEu,
-      "ap-southeast-2": resAu,
-      "ca-central-1": resCaCentral,
-    };
-
-    const datum = Object.entries(resTotal).flatMap(([region, liveEvents]) => {
-      return liveEvents.map((liveEvent) => {
-        const lattitude = Number(liveEvent.lat);
+    var datum: any[] = [];
+    resTotal.forEach((liveEvents, region) => {
+      liveEvents.map((liveEvent: LiveEvent) => {
+        const latitude = Number(liveEvent.lat);
         const longitude = Number(liveEvent.lng);
         const timestamp = new Date().getTime();
 
-        return {
+        datum.push({
           arc: {
-            startLat: lattitude,
-            endLat: AWSRegionGeo[region as validRegions].lat,
+            startLat: latitude,
+            endLat: AWSRegionGeo[region as ValidRegions].lat,
             startLng: longitude,
-            endLng: AWSRegionGeo[region as validRegions].lng,
+            endLng: AWSRegionGeo[region as ValidRegions].lng,
             color: "#8f7000",
             timestamp,
           } as ArcData,
           sourceRing: {
-            lat: lattitude,
+            lat: latitude,
             lng: longitude,
             timestamp,
           } as RingData,
           label: {
-            lat: lattitude,
+            lat: latitude,
             lng: longitude,
             text: liveEvent.city,
             timestamp,
           } as LabelData,
-        };
+        });
       });
-    });
+    })
 
-    const arcs = datum.map((d) => d.arc);
-    const sourceRings = datum.map((d) => d.sourceRing);
-    const labels = renderLabels ? datum.map((d) => d.label) : [];
+    const arcs = datum.map((d: any) => d.arc);
+    const sourceRings = datum.map((d: any) => d.sourceRing);
+    const labels = renderLabels ? datum.map((d: any) => d.label) : [];
     const evictionTimeForArcs = flightTime;
     const evictionTimeForRings = flightTime * arcRelativeLength;
     const evictionTimeForLabels = flightTime;
@@ -210,6 +196,16 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
     emissive: '#062d70'
   });
 
+  const regionsInEnv: any = envRegionMapping[env].map((regionConfig: any) => {
+    return regionConfig["region"]
+  });
+
+  const htmlElementsData: any = regionsInEnv.map((region: any) => {
+    return {
+      ...AWSRegionGeo[region as ValidRegions],
+      size: 1,
+    }
+  });
 
   return (
     <ReactGlobeGl
@@ -278,24 +274,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
       hexPolygonColor={() => '#34ad95'}
       hexPolygonMargin={0.3}
       showGlobe={true}
-      htmlElementsData={[
-        {
-          ...AWSRegionGeo["us-east-1"],
-          size: 1,
-        },
-        {
-          ...AWSRegionGeo["eu-west-1"],
-          size: 1,
-        },
-        {
-          ...AWSRegionGeo["ap-southeast-2"],
-          size: 1,
-        },
-        {
-          ...AWSRegionGeo["ca-central-1"],
-          size: 1,
-        },
-      ].concat([])}
+      htmlElementsData={htmlElementsData.concat([])}
       htmlElement={() => {
         const el = document.createElement("img");
         el.setAttribute("src", "/favicon.png");

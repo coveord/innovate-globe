@@ -17,10 +17,16 @@ export interface TimeBucketMetric {
     count: string;
 }
 
+export type ValidRegions = "us-east-1" | "us-east-2" | "eu-west-1" | "ap-southeast-2" | "ca-central-1";
+
 export const AWSRegionGeo = {
     "us-east-1": {
         lat: 37.926868,
         lng: -78.024902,
+    },
+    "us-east-2": {
+        lat: 39.962222,
+        lng: -83.000556,
     },
     "eu-west-1": {
         lat: 53.350140,
@@ -86,19 +92,3 @@ export const envRegionMapping: any = {
         }
     ]
 }
-
-export const LambdaURLUsEast = `https://rha5ieunhnmgc3d4xtsow4dj240mggtt.lambda-url.us-east-1.on.aws/?password=${localStorage.getItem(
-    "pw"
-)}`;
-
-export const LambdaURLEU = `https://c6xdcpmacp66i4njcrrwatb73i0opcjr.lambda-url.eu-west-1.on.aws/?password=${localStorage.getItem(
-    "pw"
-)}`;
-
-export const LambdaURLAu = `https://72fup7tch7frsprfdvbctvaiv40sommb.lambda-url.ap-southeast-2.on.aws/?password=${localStorage.getItem(
-    "pw"
-)}`;
-export const LambdaURLCaCentral = `https://bmhvpjqu6axz5sybivpkt4j4oy0maebe.lambda-url.ca-central-1.on.aws/?password=${localStorage.getItem(
-    "pw"
-)}`;
-
