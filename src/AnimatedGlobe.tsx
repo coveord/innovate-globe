@@ -93,7 +93,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
 
     var datum: any[] = [];
     resTotal.forEach((liveEvents, region) => {
-      liveEvents.map((liveEvent: LiveEvent) => {
+      liveEvents.forEach((liveEvent: LiveEvent) => {
         const latitude = Number(liveEvent.lat);
         const longitude = Number(liveEvent.lng);
         const timestamp = new Date().getTime();
