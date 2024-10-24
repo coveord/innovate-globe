@@ -20,10 +20,15 @@ function onBFCMWeekend(day: string) {
     return bfcmDays.includes(day);
 }
 
+function daysInPastOfBfcmWeekend(day: string) {
+    const currentDayIndex = bfcmDays.indexOf(day);
+    return bfcmDays.slice(0, currentDayIndex);
+}
+
 const lambdaClient: AxiosInstance = axios.create();
 
-const bfcmDays = ["2023-11-24", "2023-11-25", "2023-11-26", "2023-11-27"];
-const isBFCMWeekend = onBFCMWeekend(new Date().toISOString().split('T')[0]);
+const bfcmDays = ["2024-11-29", "2024-11-30", "2024-12-01", "2024-12-02"];
+var isBFCMWeekend = false;
 
 export const Charts: FunctionComponent<ChartsProps> = (props) => {
     const [us1Latency, setUs1Latency] = useState<number>(0);
@@ -116,7 +121,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             currentdate.setSeconds(0);
             currentdate.setMinutes(currentMinute - 1);
             var currentDay = currentdate.toISOString().split('T')[0];
-            var isOnBFCMWeekend = onBFCMWeekend(currentDay);
+            isBFCMWeekend = onBFCMWeekend(currentDay);
 
             for (const regionConfig of envRegionMapping[query.env]) {
                 arrayPromises.push(await lambdaClient
@@ -155,16 +160,39 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                         }
                     })
                 }
-                setPurchasesPerMinute(purchasesPerMinuteAcrossRegions);
-                setRevenuePerMinute(revenuePerMinuteAcrossRegions);
-                setAddToCartsPerMinute(addToCartsPerMinuteAcrossRegions);
+            }
+            setPurchasesPerMinute(purchasesPerMinuteAcrossRegions);
+            setRevenuePerMinute(revenuePerMinuteAcrossRegions);
+            setAddToCartsPerMinute(addToCartsPerMinuteAcrossRegions);
 
-                setPurchasesPerDay(purchasesPerDayAcrossRegions);
-                setRevenuePerDay(revenuePerDayAcrossRegions);
-                setAddToCartsPerDay(addToCartsPerDayAcrossRegions);
-                if (isOnBFCMWeekend) {
-                    setBfcmRevenue(revenuePerDayAcrossRegions);
+            setPurchasesPerDay(purchasesPerDayAcrossRegions);
+            setRevenuePerDay(revenuePerDayAcrossRegions);
+            setAddToCartsPerDay(addToCartsPerDayAcrossRegions);
+
+            if (isBFCMWeekend) {
+                var arrayPromises:any = [];
+                var totalBfcmRevenue = revenuePerDayAcrossRegions;
+                const bfcmWeekend = daysInPastOfBfcmWeekend(currentDay);
+                for (const bfcmDay of bfcmWeekend) {
+                    for (const regionConfig of envRegionMapping[query.env]) {
+                        arrayPromises.push(await lambdaClient
+                            .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${bfcmDay}&timeBucketType=daily`));
+                    }
+                    await Promise.all(arrayPromises);
+                    for (const promise of arrayPromises) {
+                        if (Array.isArray(promise.data)) {
+                            const metrics = promise.data;
+                            metrics.forEach((metric: TimeBucketMetric) => {
+                                if (metric.timeBucketType === 'daily') {
+                                    if (metric.type === 'revenue') {
+                                        totalBfcmRevenue += Number(metric.count);
+                                    }
+                                }
+                            })
+                        }
+                    }
                 }
+                setBfcmRevenue(totalBfcmRevenue);
             }
         }
     };

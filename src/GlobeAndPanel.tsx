@@ -103,7 +103,7 @@ export const GlobeAndPanel: FunctionComponent = () => {
                     <Image src={"coveo.png"} style={{width: "50px"}}/>
                 </Grid.Col>
                 <Grid.Col span={6} style={{borderLeft: "2px solid white"}}>
-                    <Text>bfcm'23</Text>
+                    <Text>bfcm'24</Text>
                 </Grid.Col>
 
             </Grid>
