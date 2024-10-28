@@ -261,7 +261,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
       arcDashAnimateTime={flightTime}
       arcsTransitionDuration={0}
       arcAltitudeAutoScale={arcAltitudeAutoScale}
-      arcStroke={arcStroke === 1 ? null : arcStroke}
+      arcStroke={0.25}
       ringsData={renderRings ? ringsData : []}
       ringColor={"color"}
       ringResolution={100}
