@@ -49,7 +49,6 @@ interface AnimatedGlobeProps {
   ringSpeed: number;
   numberOfAnimation: number;
   arcDashGap: number;
-  arcStroke: number;
   atmosphereAltitude: number;
   arcAltitudeAutoScale: number;
   env: string;
@@ -69,7 +68,6 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   ringRadius,
   ringSpeed,
   arcDashGap,
-  arcStroke,
   arcAltitudeAutoScale,
     env
 }) => {
@@ -261,7 +259,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
       arcDashAnimateTime={flightTime}
       arcsTransitionDuration={0}
       arcAltitudeAutoScale={arcAltitudeAutoScale}
-      arcStroke={arcStroke === 1 ? null : arcStroke}
+      arcStroke={0.25}
       ringsData={renderRings ? ringsData : []}
       ringColor={"color"}
       ringResolution={100}
