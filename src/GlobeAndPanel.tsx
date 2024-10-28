@@ -36,7 +36,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
         ringSpeed: NumberParam,
         numAnimation: NumberParam,
         arcDashGap: NumberParam,
-        arcStroke: NumberParam,
         arcAltitude: NumberParam,
         atmosphereAltitude: NumberParam,
         eartImg: StringParam,
@@ -72,7 +71,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
         force(query.numAnimation, 50)
     );
     const [arcDashGap, setArcDashGap] = useState(force(query.arcDashGap, 2));
-    const [arcStroke, setArcStroke] = useState(force(query.arcStroke, 1));
     const [env, setEnv] = useState(force(query.env, "prd"));
     const [arcAltitudeAutoScale, setArcAltitudeAutoScale] = useState(
         force(query.arcAltitude, 0.5)
@@ -210,8 +208,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
                                 setQuery({env: e!});
                             }}
                         />
-
-
                         <NumberInput
                             label="Tick speed"
                             value={tickSpeed}
@@ -258,14 +254,7 @@ export const GlobeAndPanel: FunctionComponent = () => {
                             step={0.1}
                             min={0}
                         />
-                        <NumberInput
-                            label="Arc stroke"
-                            value={arcStroke}
-                            onChange={(e) => {
-                                setArcStroke(e!);
-                                setQuery({arcStroke: e!});
-                            }}
-                        />
+                        
                         <NumberInput
                             label="Arc altitude"
                             value={arcAltitudeAutoScale}
@@ -331,7 +320,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
                 ringSpeed={ringSpeed}
                 numberOfAnimation={numberOfAnimation}
                 arcDashGap={arcDashGap}
-                arcStroke={arcStroke}
                 atmosphereAltitude={atmosphereAltitude}
                 arcAltitudeAutoScale={arcAltitudeAutoScale}
                 env={env}
