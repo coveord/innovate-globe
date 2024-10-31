@@ -19,6 +19,13 @@ import {
     StringParam,
 } from "use-query-params";
 import {IconAdjustments} from "@tabler/icons-react";
+import { CoveoEnvironment, normalizeCoveoEnvironment } from "./Events";
+
+const ENVIRONMENTS = Object.freeze<Array<{value: CoveoEnvironment, label: string}>>([
+    {value: 'dev', label: 'Development'},
+    {value: 'stg', label: 'Staging'},
+    {value: 'prd', label: 'Production'},
+]);
 
 export const GlobeAndPanel: FunctionComponent = () => {
     const [query, setQuery] = useQueryParams({
@@ -71,7 +78,7 @@ export const GlobeAndPanel: FunctionComponent = () => {
         force(query.numAnimation, 50)
     );
     const [arcDashGap, setArcDashGap] = useState(force(query.arcDashGap, 2));
-    const [env, setEnv] = useState(force(query.env, "prd"));
+    const [env, setEnv] = useState(normalizeCoveoEnvironment(query.env));
     const [arcAltitudeAutoScale, setArcAltitudeAutoScale] = useState(
         force(query.arcAltitude, 0.5)
     );
@@ -198,14 +205,10 @@ export const GlobeAndPanel: FunctionComponent = () => {
                             label="Select your environment"
                             defaultValue={"prd"}
                             value={env}
-                            data={[
-                                {value: 'dev', label: 'Development'},
-                                {value: 'stg', label: 'Staging'},
-                                {value: 'prd', label: 'Production'},
-                            ]}
-                            onChange={(e) => {
-                                setEnv(e!);
-                                setQuery({env: e!});
+                            data={ENVIRONMENTS}
+                            onChange={(e: CoveoEnvironment) => {
+                                setEnv(e);
+                                setQuery({env: e});
                             }}
                         />
                         <NumberInput

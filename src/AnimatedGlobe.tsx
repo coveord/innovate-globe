@@ -6,6 +6,7 @@ import {
   ValidRegions,
   envRegionMapping,
   LiveEvent,
+  CoveoEnvironment,
 } from "./Events";
 import { uniqBy } from "lodash";
 import * as THREE from "three";
@@ -51,7 +52,7 @@ interface AnimatedGlobeProps {
   arcDashGap: number;
   atmosphereAltitude: number;
   arcAltitudeAutoScale: number;
-  env: string;
+  env: CoveoEnvironment;
 }
 
 export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
