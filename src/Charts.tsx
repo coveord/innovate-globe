@@ -8,7 +8,7 @@ import {
     LiveEvent,
     TimeBucketMetric,
 } from "./Events";
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { StringParam, useQueryParams } from "use-query-params";
 import CountUp from 'react-countup';
 
@@ -40,6 +40,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
     const [purchasesPerMinute, setPurchasesPerMinute] = useState<number>(0);
     const [revenuePerMinute, setRevenuePerMinute] = useState<number>(0);
     const [addToCartsPerMinute, setAddToCartsPerMinute] = useState<number>(0);
+    const [uniqueUsersPerMinute, setUniqueUsersPerMinute] = useState<number>(0);
 
     const prevPurchaseStateRef = useRef(0);
     const prevRevenueStateRef = useRef(0);
@@ -105,95 +106,101 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
         if (!query.env) {
             query.env = "prd";
         }
-        if (query.env) {
-            var purchasesPerMinuteAcrossRegions = 0;
-            var revenuePerMinuteAcrossRegions = 0;
-            var addToCartsPerMinuteAcrossRegions = 0;
+        var purchasesPerMinuteAcrossRegions = 0;
+        var revenuePerMinuteAcrossRegions = 0;
+        var addToCartsPerMinuteAcrossRegions = 0;
+        var uniqueUsersPerMinuteAcrossRegions = 0;
 
-            var purchasesPerDayAcrossRegions = 0;
-            var revenuePerDayAcrossRegions = 0;
-            var addToCartsPerDayAcrossRegions = 0;
+        var purchasesPerDayAcrossRegions = 0;
+        var revenuePerDayAcrossRegions = 0;
+        var addToCartsPerDayAcrossRegions = 0;
 
-            var arrayPromises:any = [];
-            var currentdate = new Date();
-            var currentMinute = currentdate.getMinutes();
-            currentdate.setMilliseconds(0);
-            currentdate.setSeconds(0);
-            currentdate.setMinutes(currentMinute - 1);
-            var currentDay = currentdate.toISOString().split('T')[0];
-            isBFCMWeekend = onBFCMWeekend(currentDay);
+        var arrayPromises: Array<Promise<AxiosResponse<TimeBucketMetric[]>>> = [];
+        var currentdate = new Date();
+        var currentMinute = currentdate.getMinutes();
+        currentdate.setMilliseconds(0);
+        currentdate.setSeconds(0);
+        currentdate.setMinutes(currentMinute - 1);
+        var currentDay = currentdate.toISOString().split('T')[0];
+        isBFCMWeekend = onBFCMWeekend(currentDay);
 
-            for (const regionConfig of envRegionMapping[query.env]) {
-                arrayPromises.push(await lambdaClient
-                    .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentdate.toISOString()}&timeBucketType=minutely`).catch((e) => {
-                        console.log("Caught an error calling the lambda", e);
-                        return new Promise(() => { return {"data":[]}});
-                    }));
-                arrayPromises.push(await lambdaClient
-                    .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentDay}&timeBucketType=daily`));
+        for (const regionConfig of envRegionMapping[query.env]) {
+            arrayPromises.push(lambdaClient
+                .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentdate.toISOString()}&timeBucketType=minutely`).catch((e) => {
+                    console.log("Caught an error calling the lambda", e);
+                    return new Promise(() => { return {"data":[]}});
+                }));
+            arrayPromises.push(lambdaClient
+                .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentDay}&timeBucketType=daily`));
+        }
+        for (const response of await Promise.all(arrayPromises)) {
+            if (!Array.isArray(response.data)) {
+                continue;
             }
-            await Promise.all(arrayPromises);
-            for (const promise of arrayPromises) {
-                if (Array.isArray(promise.data)) {
-                    const metrics = promise.data;
-                    metrics.forEach((metric: TimeBucketMetric) => {
-                        if (metric.timeBucketType === 'minutely') {
-                            if (metric.type === 'purchases') {
-                                purchasesPerMinuteAcrossRegions += Number(metric.count);
-                            }
-                            if (metric.type === 'revenue') {
-                                revenuePerMinuteAcrossRegions += Number(metric.count);
-                            }
-                            if (metric.type === 'addToCart') {
-                                addToCartsPerMinuteAcrossRegions += Number(metric.count);
-                            }
-                        } else if (metric.timeBucketType === 'daily') {
-                            if (metric.type === 'purchases') {
-                                purchasesPerDayAcrossRegions += Number(metric.count);
-                            }
-                            if (metric.type === 'revenue') {
-                                revenuePerDayAcrossRegions += Number(metric.count);
-                            }
-                            if (metric.type === 'addToCart') {
-                                addToCartsPerDayAcrossRegions += Number(metric.count);
-                            }
-                        }
-                    })
-                }
-            }
-            setPurchasesPerMinute(purchasesPerMinuteAcrossRegions);
-            setRevenuePerMinute(revenuePerMinuteAcrossRegions);
-            setAddToCartsPerMinute(addToCartsPerMinuteAcrossRegions);
 
-            setPurchasesPerDay(purchasesPerDayAcrossRegions);
-            setRevenuePerDay(revenuePerDayAcrossRegions);
-            setAddToCartsPerDay(addToCartsPerDayAcrossRegions);
-
-            if (isBFCMWeekend) {
-                var arrayPromises:any = [];
-                var totalBfcmRevenue = revenuePerDayAcrossRegions;
-                const bfcmWeekend = daysInPastOfBfcmWeekend(currentDay);
-                for (const bfcmDay of bfcmWeekend) {
-                    for (const regionConfig of envRegionMapping[query.env]) {
-                        arrayPromises.push(await lambdaClient
-                            .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${bfcmDay}&timeBucketType=daily`));
+            const metrics = response.data;
+            metrics.forEach((metric: TimeBucketMetric) => {
+                const value = +metric.count || 0;
+                if (metric.timeBucketType === 'minutely') {
+                    switch (metric.type) {
+                        case 'purchases':
+                            purchasesPerMinuteAcrossRegions += value;
+                            break;
+                        case 'revenue':
+                            revenuePerMinuteAcrossRegions += value;
+                            break;
+                        case 'addToCart':
+                            addToCartsPerMinuteAcrossRegions += value;
+                            break;
+                        case 'uniqueUsers':
+                            uniqueUsersPerMinuteAcrossRegions += value;
+                            break;
                     }
-                    await Promise.all(arrayPromises);
-                    for (const promise of arrayPromises) {
-                        if (Array.isArray(promise.data)) {
-                            const metrics = promise.data;
-                            metrics.forEach((metric: TimeBucketMetric) => {
-                                if (metric.timeBucketType === 'daily') {
-                                    if (metric.type === 'revenue') {
-                                        totalBfcmRevenue += Number(metric.count);
-                                    }
-                                }
-                            })
-                        }
+                } else if (metric.timeBucketType === 'daily') {
+                    switch (metric.type) {
+                        case 'purchases':
+                            purchasesPerDayAcrossRegions += value;
+                            break;
+                        case 'revenue':
+                            revenuePerDayAcrossRegions += value;
+                            break;
+                        case 'addToCart':
+                            addToCartsPerDayAcrossRegions += value;
+                            break;
                     }
                 }
-                setBfcmRevenue(totalBfcmRevenue);
+            })
+        }
+        setPurchasesPerMinute(purchasesPerMinuteAcrossRegions);
+        setRevenuePerMinute(revenuePerMinuteAcrossRegions);
+        setAddToCartsPerMinute(addToCartsPerMinuteAcrossRegions);
+        setUniqueUsersPerMinute(uniqueUsersPerMinuteAcrossRegions);
+
+        setPurchasesPerDay(purchasesPerDayAcrossRegions);
+        setRevenuePerDay(revenuePerDayAcrossRegions);
+        setAddToCartsPerDay(addToCartsPerDayAcrossRegions);
+
+        if (isBFCMWeekend) {
+            arrayPromises = [];
+            var totalBfcmRevenue = revenuePerDayAcrossRegions;
+            const bfcmWeekend = daysInPastOfBfcmWeekend(currentDay);
+            for (const bfcmDay of bfcmWeekend) {
+                for (const regionConfig of envRegionMapping[query.env]) {
+                    arrayPromises.push(lambdaClient
+                        .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${bfcmDay}&timeBucketType=daily`));
+                }
+                for (const promise of await Promise.all(arrayPromises)) {
+                    if (!Array.isArray(promise.data)) {
+                        continue;
+                    }
+                    promise.data.forEach((metric) => {
+                        if (metric.timeBucketType === 'daily' && metric.type === 'revenue') {
+                            totalBfcmRevenue += Number(metric.count);
+                        }
+                    });
+                }
             }
+            setBfcmRevenue(totalBfcmRevenue);
         }
     };
 
@@ -367,17 +374,21 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 height: 100,
                 left: "20%"
             }}>
-                <Grid.Col span={4} style={{ color: "white", borderLeft: "4px solid white" }}>
+                <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Sales per minute (USD)</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{USDollar.format(revenuePerMinute)}</Text>
                 </Grid.Col>
-                <Grid.Col span={4} style={{ color: "white", borderLeft: "4px solid white" }}>
+                <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Add to cart per minute</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{addToCartsPerMinute}</Text>
                 </Grid.Col>
-                <Grid.Col span={4} style={{ color: "white", borderLeft: "4px solid white" }}>
+                <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Transactions per minute</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{purchasesPerMinute}</Text>
+                </Grid.Col>
+                <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
+                    <Text size="xl" color={"darkgrey"}>Unique users per minute</Text>
+                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{uniqueUsersPerMinute}</Text>
                 </Grid.Col>
             </Grid>
 
