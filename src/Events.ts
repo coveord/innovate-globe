@@ -1,5 +1,6 @@
 export interface LiveEvent {
     city: string;
+    country: string;
     event_id: string;
     inserted_at: number;
     lat: string;

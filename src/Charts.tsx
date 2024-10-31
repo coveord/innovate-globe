@@ -36,6 +36,17 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
     const [euLatency, setEuLatency] = useState<number>(0);
     const [apLatency, setApLatency] = useState<number>(0);
     const [caLatency, setCaLatency] = useState<number>(0);
+    const [countries, setCountries] = useState(new Map());
+
+    const updateCountries = (countriesToUpdate: Map<string, number>) => {
+        const updatedCountries = countries;
+        countriesToUpdate.forEach((count:number, country:string) => {
+            if (updatedCountries.has(country)) {
+                updatedCountries.set(country, updatedCountries.get(country)count;
+            }
+        })
+        setCountries(updatedCountries);
+    }
 
     const [purchasesPerMinute, setPurchasesPerMinute] = useState<number>(0);
     const [revenuePerMinute, setRevenuePerMinute] = useState<number>(0);
@@ -209,6 +220,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     console.log(e);
                     const liveEvent: LiveEvent = {
                         city: "",
+                        country: "",
                         event_id: "",
                         inserted_at: 0,
                         lat: "",
@@ -224,6 +236,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 const total = events.reduce((previous, current) => {
                     return current.timestamp + previous;
                 }, 0);
+                const countryCounter = events.map((event) => event.city != '' ? event.city : null).filter(v => v).reduce((acc, e) => acc.set(e, (acc.get(e) || 0) + 1), new Map());
                 const mean = total / events.length;
                 if(region == "us-east-1") {
                     setUs1Latency(Math.round((new Date().getTime() - mean) / 1000));
