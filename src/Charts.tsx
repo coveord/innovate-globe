@@ -2,7 +2,7 @@
 
 import { FunctionComponent, useEffect, useState, useRef } from "react";
 import "chart.js/auto"; // ADD THIS
-import { Grid, Text } from "@mantine/core";
+import { Grid, Space, Text } from "@mantine/core";
 import {
     CoveoEnvironment,
     envRegionMapping,
@@ -15,6 +15,7 @@ import {
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { StringParam, useQueryParams } from "use-query-params";
 import CountUp from 'react-countup';
+import Marquee from 'react-fast-marquee';
 
 export interface ChartsProps {
     tickSpeed?: number;
@@ -232,6 +233,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             if (countriesChanged) {
                 // Note: map updated in-place, but set it to invalidate the state.
                 setEventsPerCountry(eventsPerCountry);
+                
             }
             const now = Date.now();
             const total = events.reduce((previous, {timestamp}) => {
@@ -369,9 +371,34 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     </Text>
                 </Grid.Col>
             </Grid> }
+            { eventsPerCountry?.size && 
+                <Grid style={{
+                    position: "fixed",
+                    bottom: "25%",
+                    padding: 10,
+                    zIndex: 4,
+                    width: "100%",
+                }}>
+                    <Grid.Col span={12} style={{ color: "white" }}>
+                        <Text size="xl" color={"darkgrey"}>Purchases per Country</Text>
+                        <Marquee>
+                            <div>
+                                <Text style={{ fontSize: "xx-large" }} color={"white"}>{eventsPerCountry}</Text>
+                            {/* { Object.entries(eventsPerCountry).map(([country, count], _) =>
+                                <div>
+                                    <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
+                                    <Space w="xs"/>
+                                    <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{count}</Text>
+                                </div>
+                            )} */}
+                            </div>
+                        </Marquee>
+                    </Grid.Col>
+                </Grid> }
+
             <Grid style={{
                 position: "fixed",
-                bottom: 100,
+                bottom: "15%",
                 padding: 10,
                 zIndex: 2,
                 width: "80%",
@@ -395,7 +422,6 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(uniqueUsersPerMinute)}</Text>
                 </Grid.Col>
             </Grid>
-
 
             <div style={{
                 position: "fixed",
