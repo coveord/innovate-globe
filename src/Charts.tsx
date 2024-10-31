@@ -374,25 +374,27 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             { eventsPerCountry?.size && 
                 <Grid style={{
                     position: "fixed",
-                    bottom: "25%",
-                    padding: 10,
+                    top:"40%",
+                    height: 10,
+                    width: "10%",
                     zIndex: 4,
-                    width: "100%",
+                    right: "20%",
                 }}>
-                    <Grid.Col span={12} style={{ color: "white" }}>
-                        <Text size="xl" color={"darkgrey"}>Purchases per Country</Text>
-                        <Marquee>
-                            <div>
-                                <Text style={{ fontSize: "xx-large" }} color={"white"}>{eventsPerCountry}</Text>
-                            {/* { Object.entries(eventsPerCountry).map(([country, count], _) =>
-                                <div>
-                                    <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
-                                    <Space w="xs"/>
-                                    <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{count}</Text>
-                                </div>
-                            )} */}
-                            </div>
-                        </Marquee>
+                    <Grid.Col span={10} style={{ color: "white", height: 10 }}>
+                        <div>
+                            <Text size="xl" color={"darkgrey"}>Purchases per Country</Text>
+                            <Marquee direction={"up"}>
+                                <>
+                                { [... eventsPerCountry].map(([country, count]) =>
+                                    <div>
+                                        <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
+                                        <Space w="xs"/>
+                                        <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{count}</Text>
+                                    </div>
+                                )}
+                                </>
+                            </Marquee>
+                        </div>  
                     </Grid.Col>
                 </Grid> }
 
