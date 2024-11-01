@@ -10,6 +10,7 @@ export type ValidRegions = "us-east-1" | "us-east-2" | "eu-west-1" | "ap-southea
 export interface LiveEvent {
     city: string;
     country: string;
+    eventType: string;
     event_id: string;
     inserted_at: number;
     lat: string;

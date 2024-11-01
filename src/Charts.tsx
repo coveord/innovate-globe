@@ -2,7 +2,7 @@
 
 import { FunctionComponent, useEffect, useState, useRef } from "react";
 import "chart.js/auto"; // ADD THIS
-import { Grid, Space, Text } from "@mantine/core";
+import { Grid, ScrollArea, Space, Stack, Text } from "@mantine/core";
 import {
     CoveoEnvironment,
     envRegionMapping,
@@ -211,6 +211,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 const liveEvent: LiveEvent = {
                     city: "",
                     country: "",
+                    eventType: "",
                     event_id: "",
                     inserted_at: 0,
                     lat: "",
@@ -223,8 +224,8 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             });
 
         if (events?.length > 0) {
-            const countriesChanged = events.reduce((_, {country}) => {
-                if (country) {
+            const countriesChanged = events.reduce((_, {eventType, country}) => {
+                if (country && eventType == "purchase") {
                     eventsPerCountry.set(country, (eventsPerCountry.get(country) ?? 0) + 1);
                     return true;
                 }
@@ -372,40 +373,39 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 </Grid.Col>
             </Grid> }
             { eventsPerCountry?.size && 
-                <Grid style={{
+                <Stack align="center" justify="flex-start" spacing="xs" style={{
                     position: "fixed",
-                    top:"40%",
-                    height: 10,
-                    width: "10%",
+                    display: "block",
+                    top:"25%",
+                    right: "5%",
+                    height: 100,
+                    bottom: "35%",
                     zIndex: 4,
-                    right: "20%",
                 }}>
-                    <Grid.Col span={10} style={{ color: "white", height: 10 }}>
-                        <div>
-                            <Text size="xl" color={"darkgrey"}>Purchases per Country</Text>
-                            <Marquee direction={"up"}>
-                                <>
-                                { [... eventsPerCountry].map(([country, count]) =>
-                                    <div>
-                                        <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
-                                        <Space w="xs"/>
-                                        <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{count}</Text>
-                                    </div>
-                                )}
-                                </>
-                            </Marquee>
-                        </div>  
-                    </Grid.Col>
-                </Grid> }
+                        <Text size="xl" color={"darkgrey"}>Purchases per Country</Text>
+                        <div style= {{ height: "100%", display: "block" }}>
+                        {/* <Marquee direction={"up"} style={{ width:"80%" }}> */}
+                            <ScrollArea style={{ height: 400 }}>
+                            { [... eventsPerCountry].sort((a: [string, number], b: [string, number]) => a[1] - b[1]).reverse().map(([country, count]) =>
+                                <div>
+                                    <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
+                                    <Space w="xs"/>
+                                    <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{count}</Text>
+                                </div>
+                            )}
+                            </ScrollArea>
+                        {/* </Marquee> */}
+                        </div>
+                </Stack> }
 
             <Grid style={{
                 position: "fixed",
                 bottom: "15%",
                 padding: 10,
                 zIndex: 2,
-                width: "80%",
+                width: "100%",
+                left: "5%",
                 height: 100,
-                left: "20%"
             }}>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Sales per minute (USD)</Text>
