@@ -144,7 +144,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
         </ActionIcon>
       </Group>
       <Drawer
-        overlayProps={{ opacity: 0 }}
         opened={opened}
         onClose={() => setOpened(false)}
         title="Debug menu"
