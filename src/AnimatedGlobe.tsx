@@ -12,7 +12,7 @@ import { uniqBy } from "lodash";
 import * as THREE from "three";
 
 interface ArcData {
-  filter?: any;
+  //filter?: any;
   startLat: number;
   startLng: number;
   endLat: number;
@@ -24,7 +24,7 @@ interface ArcData {
 interface RingData {
   lat: number;
   lng: number;
-  color: string;
+  //color: string;
   timestamp: number;
 }
 
@@ -70,7 +70,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   ringSpeed,
   arcDashGap,
   arcAltitudeAutoScale,
-    env
+  env,
 }) => {
   const [arcsData, setArcsData] = useState<ArcData[]>([]);
   const [ringsData, setRingsData] = useState<RingData[]>([]);
@@ -81,49 +81,50 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   const globeRef = useRef<GlobeMethods>();
 
   const emitArc = async () => {
-
-    var resTotal = new Map<string, LiveEvent[]>();
+    const resTotal = new Map<ValidRegions, LiveEvent[]>();
     for (const regionConfig of envRegionMapping[env]) {
       const liveEventFetcher: LiveEvent[] = (await (
-        await fetch(`${regionConfig["lambdaEndpoint"]}&last=${tickSpeed}`)
+        await fetch(`${regionConfig.lambdaEndpoint}&last=${tickSpeed}`)
       ).json()) as LiveEvent[];
-      resTotal.set(regionConfig["region"], liveEventFetcher);
+      resTotal.set(regionConfig.region, liveEventFetcher);
     }
 
-    var datum: any[] = [];
+    const arcs: ArcData[] = [];
+    const sourceRings: RingData[] = [];
+    const labels: LabelData[] = [];
+
     resTotal.forEach((liveEvents, region) => {
       liveEvents.forEach((liveEvent: LiveEvent) => {
         const latitude = Number(liveEvent.lat);
         const longitude = Number(liveEvent.lng);
-        const timestamp = new Date().getTime();
+        const timestamp = Date.now();
 
-        datum.push({
-          arc: {
-            startLat: latitude,
-            endLat: AWSRegionGeo[region as ValidRegions].lat,
-            startLng: longitude,
-            endLng: AWSRegionGeo[region as ValidRegions].lng,
-            color: "#8f7000",
-            timestamp,
-          } as ArcData,
-          sourceRing: {
-            lat: latitude,
-            lng: longitude,
-            timestamp,
-          } as RingData,
-          label: {
+        arcs.push({
+          startLat: latitude,
+          endLat: AWSRegionGeo[region].lat,
+          startLng: longitude,
+          endLng: AWSRegionGeo[region].lng,
+          color: "#8f7000",
+          timestamp,
+        });
+
+        sourceRings.push({
+          lat: latitude,
+          lng: longitude,
+          timestamp,
+        });
+
+        if (renderLabels) {
+          labels.push({
             lat: latitude,
             lng: longitude,
             text: liveEvent.city,
             timestamp,
-          } as LabelData,
-        });
+          });
+        }
       });
-    })
+    });
 
-    const arcs = datum.map((d: any) => d.arc);
-    const sourceRings = datum.map((d: any) => d.sourceRing);
-    const labels = renderLabels ? datum.map((d: any) => d.label) : [];
     const evictionTimeForArcs = flightTime;
     const evictionTimeForRings = flightTime * arcRelativeLength;
     const evictionTimeForLabels = flightTime;
@@ -139,7 +140,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
     setRingsData((ringsData: RingData[]) => {
       const filteredRings = ringsData.filter((d) => {
         return (
-          Math.abs(d.timestamp - new Date().getTime()) <= evictionTimeForRings
+          Math.abs(d.timestamp - Date.now()) <= evictionTimeForRings
         );
       });
       return [...filteredRings, ...sourceRings];
@@ -148,7 +149,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
     setLabelsData((labelsData: LabelData[]) => {
       const filteredLabels = labelsData.filter((d) => {
         return (
-          Math.abs(d.timestamp - new Date().getTime()) <=
+          Math.abs(d.timestamp - Date.now()) <=
             evictionTimeForLabels &&
           d.text !== "null" &&
           d.text !== null
@@ -180,8 +181,8 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   }, [animationTick]);
 
   if (globeRef.current) {
-    (globeRef.current.controls() as any).autoRotate = autoRotate;
-    (globeRef.current.controls() as any).autoRotateSpeed = 0.6;
+    globeRef.current.controls().autoRotate = autoRotate;
+    globeRef.current.controls().autoRotateSpeed = 0.6;
   }
 
   if (!anim) {
@@ -191,19 +192,15 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   }
 
   const material = new THREE.MeshPhongMaterial({
-    color: '#9dabf2',
-    emissive: '#062d70'
+    color: "#9dabf2",
+    emissive: "#062d70",
   });
 
-  const regionsInEnv: any = envRegionMapping[env].map((regionConfig: any) => {
-    return regionConfig["region"]
-  });
-
-  const htmlElementsData: any = regionsInEnv.map((region: any) => {
+  const htmlElementsData = envRegionMapping[env].map(({region}) => {
     return {
-      ...AWSRegionGeo[region as ValidRegions],
+      ...AWSRegionGeo[region],
       size: 1,
-    }
+    };
   });
 
   return (
@@ -270,7 +267,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
       globeMaterial={material}
       backgroundColor={"#181d3a"}
       hexPolygonsData={[...globeData.features]}
-      hexPolygonColor={() => '#34ad95'}
+      hexPolygonColor={() => "#34ad95"}
       hexPolygonMargin={0.3}
       showGlobe={true}
       htmlElementsData={htmlElementsData.concat([])}
