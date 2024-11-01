@@ -19,13 +19,16 @@ import {
     StringParam,
 } from "use-query-params";
 import {IconAdjustments} from "@tabler/icons-react";
-import { CoveoEnvironment, normalizeCoveoEnvironment } from "./Events";
+import { CoveoEnvironment, isCoveoEnvironment, normalizeCoveoEnvironment } from "./Events";
 
 const ENVIRONMENTS = Object.freeze<Array<{value: CoveoEnvironment, label: string}>>([
     {value: 'dev', label: 'Development'},
     {value: 'stg', label: 'Staging'},
     {value: 'prd', label: 'Production'},
 ]);
+
+const isNumber = (value: unknown): value is number =>
+    typeof value === 'number' && !Number.isNaN(value);
 
 export const GlobeAndPanel: FunctionComponent = () => {
     const [query, setQuery] = useQueryParams({
@@ -130,7 +133,7 @@ export const GlobeAndPanel: FunctionComponent = () => {
                 </ActionIcon>
             </Group>
             <Drawer
-                overlayOpacity={0}
+                overlayProps={{opacity: 0}}
                 opened={opened}
                 onClose={() => setOpened(false)}
                 title="Debug menu"
@@ -206,41 +209,51 @@ export const GlobeAndPanel: FunctionComponent = () => {
                             defaultValue={"prd"}
                             value={env}
                             data={ENVIRONMENTS}
-                            onChange={(e: CoveoEnvironment) => {
-                                setEnv(e);
-                                setQuery({env: e});
+                            onChange={(e) => {
+                                if (isCoveoEnvironment(e)) {
+                                    setEnv(e);
+                                    setQuery({env: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Tick speed"
                             value={tickSpeed}
                             onChange={(e) => {
-                                setTickSpeed(e!);
-                                setQuery({tickSpeed: e!});
+                                if (isNumber(e)) {
+                                    setTickSpeed(e);
+                                    setQuery({tickSpeed: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Number of animations"
                             value={numberOfAnimation}
                             onChange={(e) => {
-                                setNumberOfAnimation(e!);
-                                setQuery({numAnimation: e!});
+                                if (isNumber(e)) {
+                                    setNumberOfAnimation(e);
+                                    setQuery({numAnimation: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Flight time"
                             value={flightTime}
                             onChange={(e) => {
-                                setFlightTime(e!);
-                                setQuery({flightTime: e!});
+                                if (isNumber(e)) {
+                                    setFlightTime(e);
+                                    setQuery({flightTime: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Arc relative length"
                             value={arcRelativeLength}
                             onChange={(e) => {
-                                setArcRelativeLength(e!);
-                                setQuery({arcRelLength: e!});
+                                if (isNumber(e)) {
+                                    setArcRelativeLength(e);
+                                    setQuery({arcRelLength: e});
+                                }
                             }}
                             precision={2}
                             step={0.1}
@@ -250,8 +263,10 @@ export const GlobeAndPanel: FunctionComponent = () => {
                             label="Arc dash gap"
                             value={arcDashGap}
                             onChange={(e) => {
-                                setArcDashGap(e!);
-                                setQuery({arcDashGap: e!});
+                                if (isNumber(e)) {
+                                    setArcDashGap(e);
+                                    setQuery({arcDashGap: e});
+                                }
                             }}
                             precision={2}
                             step={0.1}
@@ -262,8 +277,10 @@ export const GlobeAndPanel: FunctionComponent = () => {
                             label="Arc altitude"
                             value={arcAltitudeAutoScale}
                             onChange={(e) => {
-                                setArcAltitudeAutoScale(e!);
-                                setQuery({arcAltitude: e!});
+                                if (isNumber(e)) {
+                                    setArcAltitudeAutoScale(e);
+                                    setQuery({arcAltitude: e});
+                                }
                             }}
                             precision={2}
                             step={0.1}
@@ -273,32 +290,40 @@ export const GlobeAndPanel: FunctionComponent = () => {
                             label="Ring radius"
                             value={ringRadius}
                             onChange={(e) => {
-                                setRingRadius(e!);
-                                setQuery({ringRadius: e!});
+                                if (isNumber(e)) {
+                                    setRingRadius(e);
+                                    setQuery({ringRadius: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Ring speed"
                             value={ringSpeed}
                             onChange={(e) => {
-                                setRingSpeed(e!);
-                                setQuery({ringSpeed: e!});
+                                if (isNumber(e)) {
+                                    setRingSpeed(e);
+                                    setQuery({ringSpeed: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Number of rings"
                             value={numRings}
                             onChange={(e) => {
-                                setNumRings(e!);
-                                setQuery({numRings: e!});
+                                if (isNumber(e)) {
+                                    setNumRings(e);
+                                    setQuery({numRings: e});
+                                }
                             }}
                         />
                         <NumberInput
                             label="Atmosphere altitude"
                             value={atmosphereAltitude}
                             onChange={(e) => {
-                                setAtmosphereAltitude(e!);
-                                setQuery({atmosphereAltitude: e!});
+                                if (isNumber(e)) {
+                                    setAtmosphereAltitude(e);
+                                    setQuery({atmosphereAltitude: e});
+                                }
                             }}
                             precision={2}
                             step={0.1}
