@@ -2,7 +2,8 @@
 
 import { FunctionComponent, useEffect, useState, useRef } from "react";
 import "chart.js/auto"; // ADD THIS
-import { Grid, ScrollArea, Space, Stack, Text } from "@mantine/core";
+import { Grid, ScrollArea, Space, Stack, Text, Tooltip } from "@mantine/core";
+import { IconInfoCircle } from "@tabler/icons-react";
 import {
     CoveoEnvironment,
     envRegionMapping,
@@ -15,7 +16,6 @@ import {
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { StringParam, useQueryParams } from "use-query-params";
 import CountUp from 'react-countup';
-import Marquee from 'react-fast-marquee';
 
 export interface ChartsProps {
     tickSpeed?: number;
@@ -382,7 +382,11 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     bottom: "35%",
                     zIndex: 4,
                 }}>
-                        <Text size="xl" color={"darkgrey"}>Purchases per Country</Text>
+                        <Text size="xl" color={"darkgrey"}>Purchases per Country
+                            <Tooltip label="Purchases per country is tallied starting on page load">
+                                <IconInfoCircle/>
+                            </Tooltip>
+                        </Text>
                         <div style= {{ height: "100%", display: "block" }}>
                         {/* <Marquee direction={"up"} style={{ width:"80%" }}> */}
                             <ScrollArea style={{ height: 400 }}>

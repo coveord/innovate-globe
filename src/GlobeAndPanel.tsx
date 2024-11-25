@@ -362,6 +362,22 @@ export const GlobeAndPanel: FunctionComponent = () => {
         arcAltitudeAutoScale={arcAltitudeAutoScale}
         env={env}
       />
+
+      <Grid
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          zIndex: 1,
+          padding: "20px",
+          color: "darkgrey",
+          fontSize: "10px",
+        }}
+      >
+        <Grid.Col span={12}>
+          <Text>Internal use only</Text>
+        </Grid.Col>
+      </Grid>
     </div>
   );
 };
