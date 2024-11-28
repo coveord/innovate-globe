@@ -35,6 +35,7 @@ const lambdaClient: AxiosInstance = axios.create();
 const USDollar = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
+    maximumFractionDigits: 0
 });
 
 const numberFormat = new Intl.NumberFormat('en-US');
