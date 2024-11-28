@@ -2,8 +2,7 @@
 
 import { FunctionComponent, useEffect, useState, useRef } from "react";
 import "chart.js/auto"; // ADD THIS
-import { Grid, ScrollArea, Space, Stack, Text, Tooltip } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { Grid, ScrollArea, Space, Stack, Text } from "@mantine/core";
 import {
     CoveoEnvironment,
     envRegionMapping,
@@ -35,6 +34,7 @@ const lambdaClient: AxiosInstance = axios.create();
 const USDollar = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
+    maximumFractionDigits: 0
 });
 
 const numberFormat = new Intl.NumberFormat('en-US');
@@ -321,7 +321,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                             duration={10}
                             separator=","
                             decimal="."
-                            decimals={2}
+                            decimals={0}
                             prefix="$"
                         />
                     </Text>
@@ -338,7 +338,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     </Text>
                 </Grid.Col>
                 <Grid.Col span={4} style={{ color: "white", borderLeft: "4px solid white" }}>
-                    <Text size="xl" color={"darkgrey"}>Total transactions today</Text>
+                    <Text size="xl" color={"darkgrey"}>Total purchases today</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>
                         <CountUp
                             start={prevPurchaseStateRef.current}
@@ -366,7 +366,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                             duration={10}
                             separator=","
                             decimal="."
-                            decimals={2}
+                            decimals={0}
                             prefix="$"
                         />
                     </Text>
@@ -382,11 +382,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     bottom: "35%",
                     zIndex: 4,
                 }}>
-                        <Text size="xl" color={"darkgrey"}>Purchases per Country
-                            <Tooltip label="Purchases per country is tallied starting on page load">
-                                <IconInfoCircle/>
-                            </Tooltip>
-                        </Text>
+                        <Text size="xl" color={"darkgrey"}>Purchases per Country since page load</Text>
                         <div style= {{ height: "100%", display: "block" }}>
                         {/* <Marquee direction={"up"} style={{ width:"80%" }}> */}
                             <ScrollArea style={{ height: 400 }}>
@@ -394,7 +390,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                                 <div>
                                     <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
                                     <Space w="xs"/>
-                                    <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{count}</Text>
+                                    <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{numberFormat.format(count)}</Text>
                                 </div>
                             )}
                             </ScrollArea>
@@ -412,19 +408,19 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 height: 100,
             }}>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
-                    <Text size="xl" color={"darkgrey"}>Sales per minute (USD)</Text>
+                    <Text size="xl" color={"darkgrey"}>Sales last minute (USD)</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{USDollar.format(revenuePerMinute)}</Text>
                 </Grid.Col>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
-                    <Text size="xl" color={"darkgrey"}>Add to cart per minute</Text>
+                    <Text size="xl" color={"darkgrey"}>Add to cart last minute</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(addToCartsPerMinute)}</Text>
                 </Grid.Col>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
-                    <Text size="xl" color={"darkgrey"}>Transactions per minute</Text>
+                    <Text size="xl" color={"darkgrey"}>Purchases last minute</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(purchasesPerMinute)}</Text>
                 </Grid.Col>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
-                    <Text size="xl" color={"darkgrey"}>Unique users per minute</Text>
+                    <Text size="xl" color={"darkgrey"}>Sessions last minute</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(uniqueUsersPerMinute)}</Text>
                 </Grid.Col>
             </Grid>
@@ -438,7 +434,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 height: 120,
                 left: 0
             }}>
-                <Text color="white" weight={"bold"}>Latency</Text>
+                <Text color="white" weight={"bold"}>Metrics Latency</Text>
 
                 <Grid>
                     { regionsInEnv.map((region) => 
