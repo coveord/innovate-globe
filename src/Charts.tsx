@@ -2,8 +2,7 @@
 
 import { FunctionComponent, useEffect, useState, useRef } from "react";
 import "chart.js/auto"; // ADD THIS
-import { Grid, ScrollArea, Space, Stack, Text, Tooltip } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { Grid, ScrollArea, Space, Stack, Text } from "@mantine/core";
 import {
     CoveoEnvironment,
     envRegionMapping,
