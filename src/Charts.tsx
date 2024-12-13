@@ -5,28 +5,50 @@ import "chart.js/auto"; // ADD THIS
 import { Grid, ScrollArea, Space, Stack, Text } from "@mantine/core";
 import {
     CoveoEnvironment,
+    DailyMetrics,
+    DailyMetricsResponse,
     envRegionMapping,
     isCoveoEnvironment,
     LiveEvent,
+    MinutelyMetrics,
+    MinutelyMetricsResponse,
     normalizeCoveoEnvironment,
-    TimeBucketMetric,
+    RealTimeMetricsResponse,
     ValidRegions,
 } from "./Events";
-import axios, { AxiosInstance, AxiosResponse } from "axios";
+import axios, { AxiosInstance } from "axios";
 import { StringParam, useQueryParams } from "use-query-params";
 import CountUp from 'react-countup';
+import {aggregateDaily, aggregateMinutely, blackFriday, dayDiff, emptyDaily, emptyMinutely, plusDays} from "./utils";
+
+const calculateBfcmDay = (date: Date): number => {
+    const delta = dayDiff(blackFriday(date.getUTCFullYear()), date);
+    return delta < 0 || delta > 4 ? -1 : delta;
+};
+
+const calculatePreviousDays = (date: Readonly<Date>, bfcmDay: number): string[] => {
+    if (bfcmDay < 1) {
+        return [];
+    }
+    const pastDays: string[] = new Array(bfcmDay);
+    const thanksgiving = blackFriday(date.getUTCFullYear());
+    for (let day = 0; day < bfcmDay; ++day) {
+        pastDays[day] = plusDays(thanksgiving, 1 + day).toISOString().substring(0, 10);
+    }
+
+    return pastDays;
+}
+
+const lastMinute = (): Date => {
+    const date = new Date();
+    date.setMilliseconds(0);
+    date.setSeconds(0);
+    date.setMinutes(date.getMinutes() - 1);
+    return date;
+}
 
 export interface ChartsProps {
     tickSpeed?: number;
-}
-
-function onBFCMWeekend(day: string) {
-    return bfcmDays.includes(day);
-}
-
-function daysInPastOfBfcmWeekend(day: string) {
-    const currentDayIndex = bfcmDays.indexOf(day);
-    return bfcmDays.slice(0, currentDayIndex);
 }
 
 const lambdaClient: AxiosInstance = axios.create();
@@ -38,34 +60,47 @@ const USDollar = new Intl.NumberFormat('en-US', {
 });
 
 const numberFormat = new Intl.NumberFormat('en-US');
-
 const secondsFormat = new Intl.NumberFormat('en-US', {style: 'unit', unit: 'second', maximumFractionDigits: 1, unitDisplay: 'long'});
+const regionNameFormat = new Intl.DisplayNames('en-US', {type: 'region'});
 
-const bfcmDays = Object.freeze(["2024-11-29", "2024-11-30", "2024-12-01", "2024-12-02"]);
-let isBFCMWeekend = false;
+const EMPTY_DAILY = Object.freeze(emptyDaily());
+const EMPTY_MINUTELY = Object.freeze(emptyMinutely());
+
+const purchasesPerCountryToMap = (purchasesPerCountry: Record<string, number>): Map<string, number> => {
+    const result = new Map();
+    const countries = Object.keys(purchasesPerCountry);
+    countries.sort((a, b) => purchasesPerCountry[b] - purchasesPerCountry[a]);
+
+    for (const country of countries) {
+        result.set(country, purchasesPerCountry[country]);
+    }
+
+    return result;
+}
+
+// Normalize the response until the lambda is updated everywhere.
+const normalizeResponse = <T extends DailyMetricsResponse | MinutelyMetricsResponse>(response: T): T['metrics'] => {
+    if (Array.isArray(response)) {
+        return response.reduce((obj, metric: {type: keyof T, count: number}) => {
+            obj[metric.type] = metric.count;
+            return obj;
+        }, {});
+    }
+    return response.metrics;
+}
 
 export const Charts: FunctionComponent<ChartsProps> = (props) => {
-    const [us1Latency, setUs1Latency] = useState<number>(0);
-    const [us2Latency, setUs2Latency] = useState<number>(0);
-    const [euLatency, setEuLatency] = useState<number>(0);
-    const [apLatency, setApLatency] = useState<number>(0);
-    const [caLatency, setCaLatency] = useState<number>(0);
+    const [latencyPerRegion, setLatencyPerRegion] = useState<Partial<Record<ValidRegions, number>>>({});
+    const [dailyMetrics, setDailyMetrics] = useState<Readonly<DailyMetrics>>(EMPTY_DAILY);
+    const [minutelyMetrics, setMinutelyMetrics] = useState<Readonly<MinutelyMetrics>>(EMPTY_MINUTELY);
 
-    const [purchasesPerMinute, setPurchasesPerMinute] = useState<number>(0);
-    const [revenuePerMinute, setRevenuePerMinute] = useState<number>(0);
-    const [addToCartsPerMinute, setAddToCartsPerMinute] = useState<number>(0);
-    const [uniqueUsersPerMinute, setUniqueUsersPerMinute] = useState<number>(0);
+    const prevDailyMetricsRef = useRef(dailyMetrics);
+    const [purchasesPerCountry, setPurchasesPerCountry] = useState<Readonly<Map<string, number>>>(new Map());
 
-    const prevPurchaseStateRef = useRef(0);
-    const prevRevenueStateRef = useRef(0);
-    const prevAddToCartStateRef = useRef(0);
-    const [purchasesPerDay, setPurchasesPerDay] = useState<number>(0);
-    const [revenuePerDay, setRevenuePerDay] = useState<number>(0);
-    const [addToCartsPerDay, setAddToCartsPerDay] = useState<number>(0);
-    const [eventsPerCountry, setEventsPerCountry] = useState<Map<string, number>>(new Map());
-
+    const [bfcmDay, setBfcmDay] = useState<number>(-1);
+    const [bfcmPreviousDays, setBfcmPreviousDays] = useState<ReadonlyArray<Partial<Readonly<DailyMetrics>>>>();
+    const [bfcmMetrics, setBfcmMetrics] = useState<DailyMetrics>(EMPTY_DAILY);
     const prevBfcmRevenueRef = useRef(0);
-    const [bfcmRevenue, setBfcmRevenue] = useState<number>(0);
 
     const [animationTick, setAnimationTick] = useState(0);
 
@@ -74,8 +109,6 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
     });
 
     const [env, setEnv] = useState<CoveoEnvironment>(normalizeCoveoEnvironment(query.env));
-
-    const regionsInEnv = envRegionMapping[env].map(regionConfig => regionConfig.region);
 
     useEffect(() => {
         if (query.env !== env) {
@@ -89,190 +122,102 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
     }, [query.env, env])
 
     useEffect(() => {
-        prevPurchaseStateRef.current = purchasesPerDay;
-    }, [purchasesPerDay]);
+        prevDailyMetricsRef.current = dailyMetrics;
+    }, [dailyMetrics]);
 
     useEffect(() => {
-        prevRevenueStateRef.current = revenuePerDay;
-    }, [revenuePerDay]);
-
-    useEffect(() => {
-        prevAddToCartStateRef.current = addToCartsPerDay;
-    }, [addToCartsPerDay]);
-
-    useEffect(() => {
-        prevBfcmRevenueRef.current = bfcmRevenue;
-    }, [bfcmRevenue]);
+        prevBfcmRevenueRef.current = bfcmMetrics.revenue;
+    }, [bfcmMetrics]);
 
     const getMetrics = async () => {
-        let purchasesPerMinuteAcrossRegions = 0;
-        let revenuePerMinuteAcrossRegions = 0;
-        let addToCartsPerMinuteAcrossRegions = 0;
-        let uniqueUsersPerMinuteAcrossRegions = 0;
+        const metricsDate = lastMinute();
+        const timeBucketMinute = metricsDate.toISOString().substring(0, 16);
+        const timeBucketDay = timeBucketMinute.substring(0, 10);
 
-        let purchasesPerDayAcrossRegions = 0;
-        let revenuePerDayAcrossRegions = 0;
-        let addToCartsPerDayAcrossRegions = 0;
+        const minutelyMetricsPerRegion = await Promise.all(envRegionMapping[env].map(async (regionConfig) => {
+            const response = await lambdaClient.get<MinutelyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${timeBucketMinute}`);
+            return normalizeResponse(response.data);
+        }));
+        const dailyMetricsPerRegion = await Promise.all(envRegionMapping[env].map(async (regionConfig) => {
+            const response = await lambdaClient.get<DailyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${timeBucketDay}`);
+            return normalizeResponse(response.data);
+        }));
 
-        let arrayPromises: Array<Promise<AxiosResponse<TimeBucketMetric[]>>> = [];
-        let currentdate = new Date();
-        let currentMinute = currentdate.getMinutes();
-        currentdate.setMilliseconds(0);
-        currentdate.setSeconds(0);
-        currentdate.setMinutes(currentMinute - 1);
-        let currentDay = currentdate.toISOString().split('T')[0];
-        isBFCMWeekend = onBFCMWeekend(currentDay);
+        const minutelyMetrics = aggregateMinutely(minutelyMetricsPerRegion);
+        const dailyMetrics = aggregateDaily(dailyMetricsPerRegion);
 
-        for (const regionConfig of envRegionMapping[env]) {
-            arrayPromises.push(lambdaClient
-                .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentdate.toISOString()}&timeBucketType=minutely`).catch((e) => {
-                    console.log("Caught an error calling the lambda", e);
-                    return new Promise(() => { return {"data":[]}});
+        setDailyMetrics(dailyMetrics);
+        setMinutelyMetrics(minutelyMetrics);
+        setPurchasesPerCountry(purchasesPerCountryToMap(dailyMetrics.purchasesPerCountry));
+
+        const metricsBfcmDay = calculateBfcmDay(metricsDate);
+        let pastMetrics = bfcmPreviousDays;
+        if (metricsBfcmDay != bfcmDay) {
+            setBfcmDay(metricsBfcmDay);
+
+            if (metricsBfcmDay < 0) {
+                if (bfcmPreviousDays) {
+                    setBfcmPreviousDays(undefined);
+                }
+            } else if (bfcmPreviousDays?.length != metricsBfcmDay) {
+                const pastDays = calculatePreviousDays(metricsDate, metricsBfcmDay);
+                const pastMetricsResponses = await Promise.all(pastDays.flatMap((day) => {
+                    return envRegionMapping[env].map(regionConfig =>
+                        lambdaClient.get<DailyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${day}`)
+                    )
                 }));
-            arrayPromises.push(lambdaClient
-                .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${currentDay}&timeBucketType=daily`));
-        }
-        for (const response of await Promise.all(arrayPromises)) {
-            if (!Array.isArray(response.data)) {
-                continue;
+                pastMetrics = pastMetricsResponses.map((response) => normalizeResponse(response.data));
+                setBfcmPreviousDays(pastMetrics);
             }
-
-            const metrics = response.data;
-            metrics.forEach((metric: TimeBucketMetric) => {
-                const value = +metric.count || 0;
-                if (metric.timeBucketType === 'minutely') {
-                    switch (metric.type) {
-                        case 'purchases':
-                            purchasesPerMinuteAcrossRegions += value;
-                            break;
-                        case 'revenue':
-                            revenuePerMinuteAcrossRegions += value;
-                            break;
-                        case 'addToCart':
-                            addToCartsPerMinuteAcrossRegions += value;
-                            break;
-                        case 'uniqueUsers':
-                            uniqueUsersPerMinuteAcrossRegions += value;
-                            break;
-                    }
-                } else if (metric.timeBucketType === 'daily') {
-                    switch (metric.type) {
-                        case 'purchases':
-                            purchasesPerDayAcrossRegions += value;
-                            break;
-                        case 'revenue':
-                            revenuePerDayAcrossRegions += value;
-                            break;
-                        case 'addToCart':
-                            addToCartsPerDayAcrossRegions += value;
-                            break;
-                    }
-                }
-            })
         }
-        setPurchasesPerMinute(purchasesPerMinuteAcrossRegions);
-        setRevenuePerMinute(revenuePerMinuteAcrossRegions);
-        setAddToCartsPerMinute(addToCartsPerMinuteAcrossRegions);
-        setUniqueUsersPerMinute(uniqueUsersPerMinuteAcrossRegions);
-
-        setPurchasesPerDay(purchasesPerDayAcrossRegions);
-        setRevenuePerDay(revenuePerDayAcrossRegions);
-        setAddToCartsPerDay(addToCartsPerDayAcrossRegions);
-
-        if (isBFCMWeekend) {
-            arrayPromises = [];
-            let totalBfcmRevenue = revenuePerDayAcrossRegions;
-            const bfcmWeekend = daysInPastOfBfcmWeekend(currentDay);
-            for (const bfcmDay of bfcmWeekend) {
-                for (const regionConfig of envRegionMapping[env]) {
-                    arrayPromises.push(lambdaClient
-                        .get<TimeBucketMetric[]>(`${regionConfig.lambdaEndpoint}&timeBucket=${bfcmDay}&timeBucketType=daily`));
-                }
-                for (const promise of await Promise.all(arrayPromises)) {
-                    if (!Array.isArray(promise.data)) {
-                        continue;
-                    }
-                    promise.data.forEach((metric) => {
-                        if (metric.timeBucketType === 'daily' && metric.type === 'revenue') {
-                            totalBfcmRevenue += Number(metric.count);
-                        }
-                    });
-                }
-            }
-            setBfcmRevenue(totalBfcmRevenue);
+        if (metricsBfcmDay >= 0) {
+            setBfcmMetrics(pastMetrics && (pastMetrics.length > 0) ? aggregateDaily(pastMetrics.concat(dailyMetrics)): dailyMetrics);
         }
     };
 
-    const getEvents = envRegionMapping[env].map(({lambdaEndpoint, region}) => async () => {
-        const events = await lambdaClient
-            .get<LiveEvent[]>(`${lambdaEndpoint}&last=${props.tickSpeed}`)
-            .then((res) => res.data, (e) => {
-                console.error(e);
-                const liveEvent: LiveEvent = {
-                    city: "",
-                    country: "",
-                    eventType: "",
-                    event_id: "",
-                    inserted_at: 0,
-                    lat: "",
-                    lng: "",
-                    region: region,
-                    timestamp: 0,
-                    type: "",
-                };
-                return [liveEvent];
-            });
+    const getEvents = async () => {
+        const latency: Partial<Record<ValidRegions, number>> = {};
+        const now = Date.now();
 
-        if (events?.length > 0) {
-            const countriesChanged = events.reduce((_, {eventType, country}) => {
-                if (country && eventType == "purchase") {
-                    eventsPerCountry.set(country, (eventsPerCountry.get(country) ?? 0) + 1);
-                    return true;
-                }
-                return false;
-            }, false);
-            if (countriesChanged) {
-                // Note: map updated in-place, but set it to invalidate the state.
-                setEventsPerCountry(eventsPerCountry);
-                
+        const eventsPerRegion = await Promise.all(envRegionMapping[env].map(async ({lambdaEndpoint, region}) => {
+            const events = await lambdaClient
+                .get<RealTimeMetricsResponse>(`${lambdaEndpoint}&last=${props.tickSpeed}`)
+                .then((res) => (Array.isArray(res.data) ? res.data as LiveEvent[] : res.data.items), (e) => {
+                    console.error(e);
+                    const liveEvent: LiveEvent = {
+                        city: "",
+                        country: "",
+                        eventType: "",
+                        event_id: "",
+                        inserted_at: 0,
+                        lat: "",
+                        lng: "",
+                        region: region,
+                        timestamp: 0,
+                        type: "",
+                    };
+                    return [liveEvent];
+                });
+
+            if (events.length > 0) {
+                const total = events.reduce((previous, {timestamp}) => {
+                    return previous + (now - timestamp);
+                }, 0);
+                const mean = total / events.length;
+                latency[region] = mean / 1000;
             }
-            const now = Date.now();
-            const total = events.reduce((previous, {timestamp}) => {
-                return previous + (now - timestamp);
-            }, 0);
-            const mean = total / events.length;
-            const latency = mean / 1000;
-            switch (region) {
-                case "us-east-1":
-                    setUs1Latency(latency);
-                    break;
 
-                case "us-east-2":
-                    setUs2Latency(latency);
-                    break;
+            return events;
+        }));
 
-                case "eu-west-1":
-                    setEuLatency(latency);
-                    break;
+        setLatencyPerRegion(latency);
 
-                case "ap-southeast-2":
-                    setApLatency(latency);
-                    break;
-
-                case "ca-central-1":
-                    setCaLatency(latency);
-                    break;
-
-                default:
-                    console.log("Region not valid- {}", region);
-                    break;
-            }
-        }
-    });
+        return eventsPerRegion;
+    };
 
     useEffect(() => {
-        const timeout = setInterval(async () => {
-            await Promise.all(getEvents.map(getEvent => getEvent()));
+        const timeout = setInterval(() => {
+            getEvents();
     
             setAnimationTick(animationTick + 1);
         }, props.tickSpeed);
@@ -291,15 +236,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             clearInterval(timeout);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [env]);
-
-    const regionLatency: Record<ValidRegions, number> = {
-        "us-east-1": us1Latency,
-        "us-east-2": us2Latency,
-        "eu-west-1": euLatency,
-        "ap-southeast-2": apLatency,
-        "ca-central-1": caLatency
-    }
+    }, [env, bfcmPreviousDays]);
 
     return (
         <>
@@ -316,8 +253,8 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     <Text size="xl" color={"darkgrey"}>Total sales today (USD)</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>
                         <CountUp
-                            start={prevRevenueStateRef.current}
-                            end={revenuePerDay}
+                            start={prevDailyMetricsRef.current.revenue}
+                            end={dailyMetrics.revenue}
                             duration={10}
                             separator=","
                             decimal="."
@@ -330,8 +267,8 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     <Text size="xl" color={"darkgrey"}>Total add to cart today</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>
                         <CountUp
-                            start={prevAddToCartStateRef.current}
-                            end={addToCartsPerDay}
+                            start={prevDailyMetricsRef.current.addToCart}
+                            end={dailyMetrics.addToCart}
                             duration={10}
                             separator=","
                         />
@@ -341,15 +278,15 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     <Text size="xl" color={"darkgrey"}>Total purchases today</Text>
                     <Text weight="bold" style={{ fontSize: "xx-large" }}>
                         <CountUp
-                            start={prevPurchaseStateRef.current}
-                            end={purchasesPerDay}
+                            start={prevDailyMetricsRef.current.purchases}
+                            end={dailyMetrics.purchases}
                             duration={10}
                             separator=","
                         />
                     </Text>
                 </Grid.Col>
             </Grid>
-            {isBFCMWeekend && <Grid style={{
+            {bfcmDay >= 0 && <Grid style={{
                 position: "fixed",
                 top: "40%",
                 padding: 10,
@@ -362,7 +299,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     <Text weight="bold" style={{ fontSize: "xxx-large" }}>
                         <CountUp
                             start={prevBfcmRevenueRef.current}
-                            end={bfcmRevenue}
+                            end={bfcmMetrics.revenue}
                             duration={10}
                             separator=","
                             decimal="."
@@ -372,7 +309,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     </Text>
                 </Grid.Col>
             </Grid> }
-            { eventsPerCountry?.size && 
+            { purchasesPerCountry?.size && 
                 <Stack align="center" justify="flex-start" spacing="xs" style={{
                     position: "fixed",
                     display: "block",
@@ -382,13 +319,13 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     bottom: "35%",
                     zIndex: 4,
                 }}>
-                        <Text size="xl" color={"darkgrey"}>Purchases per Country since page load</Text>
+                        <Text size="xl" color={"darkgrey"}>Purchases per country today</Text>
                         <div style= {{ height: "100%", display: "block" }}>
                         {/* <Marquee direction={"up"} style={{ width:"80%" }}> */}
                             <ScrollArea style={{ height: 400 }}>
-                            { [... eventsPerCountry].sort((a: [string, number], b: [string, number]) => a[1] - b[1]).reverse().map(([country, count]) =>
-                                <div>
-                                    <Text style={{ fontSize: "xx-large" }} color={"white"}>{country}</Text>
+                            { Array.from(purchasesPerCountry.entries(), ([countryCode, count]) =>
+                                <div key={"country_" + countryCode}>
+                                    <Text style={{ fontSize: "xx-large" }} color={"white"}>{regionNameFormat.of(countryCode)}</Text>
                                     <Space w="xs"/>
                                     <Text style={{ fontSize: "xx-large" }} color={"green"} weight="bold">{numberFormat.format(count)}</Text>
                                 </div>
@@ -409,19 +346,19 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
             }}>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Sales last minute (USD)</Text>
-                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{USDollar.format(revenuePerMinute)}</Text>
+                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{USDollar.format(minutelyMetrics.revenue)}</Text>
                 </Grid.Col>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Add to cart last minute</Text>
-                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(addToCartsPerMinute)}</Text>
+                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(minutelyMetrics.addToCart)}</Text>
                 </Grid.Col>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Purchases last minute</Text>
-                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(purchasesPerMinute)}</Text>
+                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(minutelyMetrics.purchases)}</Text>
                 </Grid.Col>
                 <Grid.Col span={3} style={{ color: "white", borderLeft: "4px solid white" }}>
                     <Text size="xl" color={"darkgrey"}>Sessions last minute</Text>
-                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(uniqueUsersPerMinute)}</Text>
+                    <Text weight="bold" style={{ fontSize: "xx-large" }}>{numberFormat.format(minutelyMetrics.uniqueUsers)}</Text>
                 </Grid.Col>
             </Grid>
 
@@ -437,27 +374,28 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 <Text color="white" weight={"bold"}>Metrics Latency</Text>
 
                 <Grid>
-                    { regionsInEnv.map((region) => 
-                        <Grid.Col span={3} style={{ color: "white" }}>
+                    {envRegionMapping[env].map(({region}) => {
+                        const latency = latencyPerRegion[region];
+                        return (<Grid.Col key={region} span={3} style={{ color: "white" }}>
                             <Text size={14} color="white">
                                 {region}
                             </Text>
                             <Text
                                 size="sm"
                                 color={
-                                    regionLatency[region] === 0
+                                    latency == undefined || latency === 0
                                         ? "grey"
-                                        : regionLatency[region] < 5
+                                        : latency < 5
                                             ? "green"
-                                            : regionLatency[region] < 20
+                                            : latency < 20
                                                 ? "yellow"
                                                 : "red"
                                 }
                             >
-                                {secondsFormat.format(regionLatency[region])}
+                                {latency == undefined ? "(No events)" : secondsFormat.format(latency)}
                             </Text>
-                        </Grid.Col>
-                    )}
+                        </Grid.Col>);
+                    })}
                 </Grid>
             </div>
         </>

@@ -7,6 +7,7 @@ import {
   envRegionMapping,
   LiveEvent,
   CoveoEnvironment,
+  RealTimeMetricsResponse,
 } from "./Events";
 import { uniqBy } from "lodash";
 import * as THREE from "three";
@@ -55,6 +56,9 @@ interface AnimatedGlobeProps {
   env: CoveoEnvironment;
 }
 
+// Normalize the response until the lambda is updated everywhere.
+const normalizeResponse = (response: RealTimeMetricsResponse | LiveEvent[]) => Array.isArray(response) ? response : response.items;
+
 export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   renderRings,
   renderArcs,
@@ -83,9 +87,9 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   const emitArc = async () => {
     const resTotal = new Map<ValidRegions, LiveEvent[]>();
     for (const regionConfig of envRegionMapping[env]) {
-      const liveEventFetcher: LiveEvent[] = (await (
+      const liveEventFetcher: LiveEvent[] = normalizeResponse(await (
         await fetch(`${regionConfig.lambdaEndpoint}&last=${tickSpeed}`)
-      ).json()) as LiveEvent[];
+      ).json());
       resTotal.set(regionConfig.region, liveEventFetcher);
     }
 
