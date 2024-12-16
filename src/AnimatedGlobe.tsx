@@ -57,7 +57,15 @@ interface AnimatedGlobeProps {
 }
 
 // Normalize the response until the lambda is updated everywhere.
-const normalizeResponse = (response: RealTimeMetricsResponse | LiveEvent[]) => Array.isArray(response) ? response : response.items;
+const normalizeResponse = (response: RealTimeMetricsResponse | LiveEvent[] | {message: string}): LiveEvent[] => {
+    if (Array.isArray(response)) {
+      return response;
+    }
+    if ("message" in response) {
+      throw new Error(response.message);
+    }
+    return response.items;
+};
 
 export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
   renderRings,

@@ -53,6 +53,16 @@ export interface ChartsProps {
 
 const lambdaClient: AxiosInstance = axios.create();
 
+const lambdaGet = <T,>(url: string): Promise<T> =>
+    lambdaClient.get(url).then((response) => {
+        const value = response.data as T | {message: string};
+
+        if (typeof value === 'object' && value !== null && "message" in value) {
+            throw new Error(value.message);
+        }
+        return value;
+    })
+
 const USDollar = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -135,12 +145,12 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
         const timeBucketDay = timeBucketMinute.substring(0, 10);
 
         const minutelyMetricsPerRegion = await Promise.all(envRegionMapping[env].map(async (regionConfig) => {
-            const response = await lambdaClient.get<MinutelyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${timeBucketMinute}`);
-            return normalizeResponse(response.data);
+            const response = await lambdaGet<MinutelyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${timeBucketMinute}`);
+            return normalizeResponse(response);
         }));
         const dailyMetricsPerRegion = await Promise.all(envRegionMapping[env].map(async (regionConfig) => {
-            const response = await lambdaClient.get<DailyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${timeBucketDay}`);
-            return normalizeResponse(response.data);
+            const response = await lambdaGet<DailyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${timeBucketDay}`);
+            return normalizeResponse(response);
         }));
 
         const minutelyMetrics = aggregateMinutely(minutelyMetricsPerRegion);
@@ -163,10 +173,10 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                 const pastDays = calculatePreviousDays(metricsDate, metricsBfcmDay);
                 const pastMetricsResponses = await Promise.all(pastDays.flatMap((day) => {
                     return envRegionMapping[env].map(regionConfig =>
-                        lambdaClient.get<DailyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${day}`)
+                        lambdaGet<DailyMetricsResponse>(`${regionConfig.lambdaEndpoint}&timeBucket=${day}`)
                     )
                 }));
-                pastMetrics = pastMetricsResponses.map((response) => normalizeResponse(response.data));
+                pastMetrics = pastMetricsResponses.map(normalizeResponse);
                 setBfcmPreviousDays(pastMetrics);
             }
         }
@@ -199,7 +209,7 @@ export const Charts: FunctionComponent<ChartsProps> = (props) => {
                     return [liveEvent];
                 });
 
-            if (events.length > 0) {
+            if (events?.length > 0) {
                 const total = events.reduce((previous, {timestamp}) => {
                     return previous + (now - timestamp);
                 }, 0);
