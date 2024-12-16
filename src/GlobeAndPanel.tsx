@@ -119,7 +119,7 @@ export const GlobeAndPanel: FunctionComponent = () => {
           <Image src={"coveo.png"} style={{ width: "50px" }} />
         </Grid.Col>
         <Grid.Col span={6} style={{ borderLeft: "2px solid white" }}>
-          <Text>bfcm'24</Text>
+          <Text>bfcm'{new Date().getUTCFullYear().toString().substring(2)}</Text>
         </Grid.Col>
       </Grid>
 

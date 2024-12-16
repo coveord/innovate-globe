@@ -1,11 +1,13 @@
 export type CoveoEnvironment = "dev" | "stg" | "prd";
 export const isCoveoEnvironment = (value: unknown): value is CoveoEnvironment =>
-    typeof value === 'string' && /dev|stg|prod/.test(value);
+    typeof value === 'string' && /dev|stg|prd/.test(value);
 
 export const normalizeCoveoEnvironment = (value: unknown): CoveoEnvironment =>
     isCoveoEnvironment(value) ? value : 'prd';
 
 export type ValidRegions = "us-east-1" | "us-east-2" | "eu-west-1" | "ap-southeast-2" | "ca-central-1";
+
+export type MetricType = 'real-time' | 'minutely' | 'daily';
 
 export interface LiveEvent {
     city: string;
@@ -22,10 +24,37 @@ export interface LiveEvent {
     price?: string | number;
 }
 
-export interface TimeBucketMetric {
-    type: string;
-    timeBucketType: string;
-    count: string;
+export interface MetricsResponse {
+    type: MetricType;
+}
+
+export interface RealTimeMetricsResponse extends MetricsResponse {
+    type: 'real-time';
+    items: LiveEvent[];
+}
+
+export interface CommonMetrics {
+    addToCart: number;
+    purchases: number;
+    revenue: number;
+}
+
+export interface DailyMetrics extends CommonMetrics {
+    purchasesPerCountry: Record<string, number>;
+}
+
+export interface MinutelyMetrics extends CommonMetrics {
+    uniqueUsers: number;
+}
+
+export interface DailyMetricsResponse extends MetricsResponse {
+    type: 'daily';
+    metrics: Partial<DailyMetrics>;
+}
+
+export interface MinutelyMetricsResponse extends MetricsResponse {
+    type: 'minutely';
+    metrics: Partial<MinutelyMetrics>;
 }
 
 export const AWSRegionGeo = Object.freeze({
