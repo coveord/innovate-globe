@@ -42,19 +42,14 @@ const isNumber = (value: unknown): value is number =>
 
 export const GlobeAndPanel: FunctionComponent = () => {
   const [query, setQuery] = useQueryParams({
-    renderRings: BooleanParam,
     renderArcs: BooleanParam,
     renderLabels: BooleanParam,
     animate: BooleanParam,
     rotate: BooleanParam,
     debug: BooleanParam,
     tickSpeed: NumberParam,
-    numRings: NumberParam,
     flightTime: NumberParam,
     arcRelLength: NumberParam,
-    ringRadius: NumberParam,
-    ringSpeed: NumberParam,
-    numAnimation: NumberParam,
     arcDashGap: NumberParam,
     arcAltitude: NumberParam,
     atmosphereAltitude: NumberParam,
@@ -64,9 +59,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
 
   const [pw, setPw] = useState("");
 
-  const [renderRings, setRenderRings] = useState(
-    query.renderRings ?? false
-  );
   const [renderArcs, setRenderArcs] = useState(query.renderArcs ?? true);
   const [renderLabels, setRenderLabels] = useState(
     query.renderLabels ?? false
@@ -76,15 +68,9 @@ export const GlobeAndPanel: FunctionComponent = () => {
   const [rotate, setRotate] = useState(query.rotate ?? true);
   const [debug, setDebug] = useState(query.debug ?? false);
   const [tickSpeed, setTickSpeed] = useState(query.tickSpeed ?? 1000);
-  const [numRings, setNumRings] = useState(query.numRings ?? 1);
   const [flightTime, setFlightTime] = useState(query.flightTime ?? 2000);
   const [arcRelativeLength, setArcRelativeLength] = useState(
     query.arcRelLength ?? 0.5
-  );
-  const [ringRadius, setRingRadius] = useState(query.ringRadius ?? 3);
-  const [ringSpeed, setRingSpeed] = useState(query.ringSpeed ?? 5);
-  const [numberOfAnimation, setNumberOfAnimation] = useState(
-    query.numAnimation ?? 50
   );
   const [arcDashGap, setArcDashGap] = useState(query.arcDashGap ?? 2);
   const [env, setEnv] = useState(normalizeCoveoEnvironment(query.env));
@@ -167,14 +153,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
               onChange={(event) => setPw(event.currentTarget.value)}
             />
             <Checkbox
-              label="Render rings"
-              checked={renderRings}
-              onChange={() => {
-                setRenderRings(!renderRings);
-                setQuery({ renderRings: !renderRings });
-              }}
-            />
-            <Checkbox
               label="Render Labels"
               checked={renderLabels}
               onChange={() => {
@@ -237,16 +215,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
               }}
             />
             <NumberInput
-              label="Number of animations"
-              value={numberOfAnimation}
-              onChange={(e) => {
-                if (isNumber(e)) {
-                  setNumberOfAnimation(e);
-                  setQuery({ numAnimation: e });
-                }
-              }}
-            />
-            <NumberInput
               label="Flight time"
               value={flightTime}
               onChange={(e) => {
@@ -297,36 +265,6 @@ export const GlobeAndPanel: FunctionComponent = () => {
               min={0}
             />
             <NumberInput
-              label="Ring radius"
-              value={ringRadius}
-              onChange={(e) => {
-                if (isNumber(e)) {
-                  setRingRadius(e);
-                  setQuery({ ringRadius: e });
-                }
-              }}
-            />
-            <NumberInput
-              label="Ring speed"
-              value={ringSpeed}
-              onChange={(e) => {
-                if (isNumber(e)) {
-                  setRingSpeed(e);
-                  setQuery({ ringSpeed: e });
-                }
-              }}
-            />
-            <NumberInput
-              label="Number of rings"
-              value={numRings}
-              onChange={(e) => {
-                if (isNumber(e)) {
-                  setNumRings(e);
-                  setQuery({ numRings: e });
-                }
-              }}
-            />
-            <NumberInput
               label="Atmosphere altitude"
               value={atmosphereAltitude}
               onChange={(e) => {
@@ -345,18 +283,13 @@ export const GlobeAndPanel: FunctionComponent = () => {
 
       <AnimatedGlobe
         autoRotate={rotate}
-        renderRings={renderRings}
         renderArcs={renderArcs}
         renderLabels={renderLabels}
         anim={animate}
         debug={debug}
         tickSpeed={tickSpeed}
-        numRings={numRings}
         flightTime={flightTime}
         arcRelativeLength={arcRelativeLength}
-        ringRadius={ringRadius}
-        ringSpeed={ringSpeed}
-        numberOfAnimation={numberOfAnimation}
         arcDashGap={arcDashGap}
         atmosphereAltitude={atmosphereAltitude}
         arcAltitudeAutoScale={arcAltitudeAutoScale}

@@ -13,19 +13,11 @@ import { uniqBy } from "lodash";
 import * as THREE from "three";
 
 interface ArcData {
-  //filter?: any;
   startLat: number;
   startLng: number;
   endLat: number;
   endLng: number;
   color: string;
-  timestamp: number;
-}
-
-interface RingData {
-  lat: number;
-  lng: number;
-  //color: string;
   timestamp: number;
 }
 
@@ -36,20 +28,24 @@ interface LabelData {
   timestamp: number;
 }
 
+interface PendingEvent {
+  arc: Omit<ArcData, "timestamp">;
+  label?: {
+    lat: number;
+    lng: number;
+    text: string | null;
+  };
+}
+
 interface AnimatedGlobeProps {
-  renderRings: boolean;
   renderArcs: boolean;
   renderLabels: boolean;
   anim: boolean;
   autoRotate: boolean;
   debug: boolean;
   tickSpeed: number;
-  numRings: number;
   flightTime: number;
   arcRelativeLength: number;
-  ringRadius: number;
-  ringSpeed: number;
-  numberOfAnimation: number;
   arcDashGap: number;
   atmosphereAltitude: number;
   arcAltitudeAutoScale: number;
@@ -68,29 +64,89 @@ const normalizeResponse = (response: RealTimeMetricsResponse | LiveEvent[] | {me
 };
 
 export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
-  renderRings,
   renderArcs,
   renderLabels,
   anim,
   autoRotate,
   debug,
   tickSpeed,
-  numRings,
   flightTime,
   arcRelativeLength,
-  ringRadius,
-  ringSpeed,
   arcDashGap,
   arcAltitudeAutoScale,
   env,
 }) => {
   const [arcsData, setArcsData] = useState<ArcData[]>([]);
-  const [ringsData, setRingsData] = useState<RingData[]>([]);
   const [labelsData, setLabelsData] = useState<LabelData[]>([]);
   const [animationTick, setAnimationTick] = useState(0);
   const [geometryCount, setGeometryCount] = useState(0);
 
   const globeRef = useRef<GlobeMethods>();
+  const scheduledArcTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearScheduledArcTimeouts = () => {
+    scheduledArcTimeoutsRef.current.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    scheduledArcTimeoutsRef.current = [];
+  };
+
+  const sanitizeLabelText = (value: string) =>
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const addPendingEventToState = ({ arc, label }: PendingEvent) => {
+    const timestamp = Date.now();
+    const evictionTimeForArcs = flightTime + tickSpeed;
+    const evictionTimeForLabels = flightTime + tickSpeed;
+
+    setArcsData((currentArcs: ArcData[]) => {
+      const now = Date.now();
+      const filteredArcs = currentArcs.filter((entry) => now - entry.timestamp <= evictionTimeForArcs);
+      return [...filteredArcs, { ...arc, timestamp }];
+    });
+
+    setLabelsData((currentLabels: LabelData[]) => {
+      const now = Date.now();
+      const filteredLabels = currentLabels.filter((entry) =>
+        now - entry.timestamp <= evictionTimeForLabels && entry.text !== "null" && entry.text !== null
+      );
+
+      if (!renderLabels || !label || !label.text || label.text === "null") {
+        return filteredLabels;
+      }
+
+      const sanitizedText = sanitizeLabelText(label.text);
+      const updatedLabels: LabelData[] = [
+        ...filteredLabels,
+        {
+          lat: label.lat,
+          lng: label.lng,
+          text: sanitizedText,
+          timestamp,
+        },
+      ];
+
+      return uniqBy(updatedLabels, (entry) => entry.text);
+    });
+  };
+
+  const scheduleEventsForTick = (events: PendingEvent[]) => {
+    if (events.length === 0) {
+      return;
+    }
+
+    // Keep events flowing steadily across the tick window to avoid bursty updates.
+    const interval = events.length > 0 ? tickSpeed / events.length : tickSpeed;
+
+    events.forEach((event, index) => {
+      const timeoutId = setTimeout(() => {
+        addPendingEventToState(event);
+        scheduledArcTimeoutsRef.current = scheduledArcTimeoutsRef.current.filter((id) => id !== timeoutId);
+      }, Math.max(interval * index, 0));
+
+      scheduledArcTimeoutsRef.current.push(timeoutId);
+    });
+  };
 
   const emitArc = async () => {
     const resTotal = new Map<ValidRegions, LiveEvent[]>();
@@ -101,82 +157,37 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
       resTotal.set(regionConfig.region, liveEventFetcher);
     }
 
-    const arcs: ArcData[] = [];
-    const sourceRings: RingData[] = [];
-    const labels: LabelData[] = [];
+    const pendingEvents: PendingEvent[] = [];
 
     resTotal.forEach((liveEvents, region) => {
       liveEvents.forEach((liveEvent: LiveEvent) => {
         const latitude = Number(liveEvent.lat);
         const longitude = Number(liveEvent.lng);
-        const timestamp = Date.now();
 
-        arcs.push({
-          startLat: latitude,
-          endLat: AWSRegionGeo[region].lat,
-          startLng: longitude,
-          endLng: AWSRegionGeo[region].lng,
-          color: "#8f7000",
-          timestamp,
+        pendingEvents.push({
+          arc: {
+            startLat: latitude,
+            endLat: AWSRegionGeo[region].lat,
+            startLng: longitude,
+            endLng: AWSRegionGeo[region].lng,
+            color: "#8f7000",
+          },
+          label: renderLabels
+            ? {
+                lat: latitude,
+                lng: longitude,
+                text: liveEvent.city,
+              }
+            : undefined,
         });
-
-        sourceRings.push({
-          lat: latitude,
-          lng: longitude,
-          timestamp,
-        });
-
-        if (renderLabels) {
-          labels.push({
-            lat: latitude,
-            lng: longitude,
-            text: liveEvent.city,
-            timestamp,
-          });
-        }
       });
     });
 
-    const evictionTimeForArcs = flightTime;
-    const evictionTimeForRings = flightTime * arcRelativeLength;
-    const evictionTimeForLabels = flightTime;
+    scheduleEventsForTick(pendingEvents);
 
-    setArcsData((arcsData: ArcData[]) => {
-      const now = Date.now();
-      const filteredArcs = arcsData.filter((d) => {
-        return Math.abs(d.timestamp - now) <= evictionTimeForArcs;
-      });
-      return [...filteredArcs, ...arcs];
-    });
-
-    setRingsData((ringsData: RingData[]) => {
-      const filteredRings = ringsData.filter((d) => {
-        return (
-          Math.abs(d.timestamp - Date.now()) <= evictionTimeForRings
-        );
-      });
-      return [...filteredRings, ...sourceRings];
-    });
-
-    setLabelsData((labelsData: LabelData[]) => {
-      const filteredLabels = labelsData.filter((d) => {
-        return (
-          Math.abs(d.timestamp - Date.now()) <=
-            evictionTimeForLabels &&
-          d.text !== "null" &&
-          d.text !== null
-        );
-      });
-      return uniqBy([...filteredLabels, ...labels], (d) => d.text).map((d) => {
-        return {
-          ...d,
-          text: d.text.normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
-        };
-      });
-    });
-
-    setAnimationTick(animationTick + 1);
-    if (debug && animationTick % 10 === 0 && animationTick !== 0) {
+    const nextTick = animationTick + 1;
+    setAnimationTick(nextTick);
+    if (debug && nextTick % 10 === 0 && nextTick !== 0) {
       const sceneJSON = globeRef.current?.scene().toJSON();
       setGeometryCount(sceneJSON.geometries.length);
     }
@@ -191,6 +202,12 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animationTick]);
+
+  useEffect(() => {
+    return () => {
+      clearScheduledArcTimeouts();
+    };
+  }, []);
 
   if (globeRef.current) {
     globeRef.current.controls().autoRotate = autoRotate;
@@ -225,11 +242,6 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
                 lat: 2,
                 lng: 0,
                 text: `Arcs: ${arcsData.length}`,
-              },
-              {
-                lat: 4,
-                lng: 0,
-                text: `Rings: ${ringsData.length}`,
               },
               {
                 lat: 6,
@@ -270,12 +282,7 @@ export const AnimatedGlobe: FunctionComponent<AnimatedGlobeProps> = ({
       arcsTransitionDuration={0}
       arcAltitudeAutoScale={arcAltitudeAutoScale}
       arcStroke={0.25}
-      ringsData={renderRings ? ringsData : []}
-      ringColor={"color"}
-      ringResolution={100}
-      ringMaxRadius={ringRadius}
-      ringPropagationSpeed={ringSpeed}
-      ringRepeatPeriod={(flightTime * arcRelativeLength) / numRings}
+
       globeMaterial={material}
       backgroundColor={"#181d3a"}
       hexPolygonsData={[...globeData.features]}
